@@ -244,6 +244,7 @@ h2 {
 
 .stage {
   position: relative;
+  --stage-scale: 1;
   width: 100%;
   aspect-ratio: 16 / 9;
   min-height: 520px;
@@ -293,6 +294,8 @@ h2 {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.24);
   backdrop-filter: blur(3px);
+  transform: scale(var(--stage-scale));
+  transform-origin: top right;
 }
 
 .stage-controls button {
@@ -350,15 +353,15 @@ h2 {
   position: absolute;
   left: 50%;
   top: 49%;
-  width: 118px;
-  height: 118px;
+  width: calc(118px * var(--stage-scale));
+  height: calc(118px * var(--stage-scale));
   display: grid;
   place-items: center;
-  border: 7px solid #2d4054;
-  border-radius: 18px;
+  border: calc(7px * var(--stage-scale)) solid #2d4054;
+  border-radius: calc(18px * var(--stage-scale));
   background: #fffdf8;
   color: #2d4054;
-  font-size: 3.4rem;
+  font-size: calc(3.4rem * var(--stage-scale));
   font-weight: 950;
   transform: translate(-50%, -50%);
   box-shadow: 0 28px 48px rgba(36, 45, 66, 0.22);
@@ -950,9 +953,9 @@ input {
   }
 
   .dice {
-    width: 82px;
-    height: 82px;
-    font-size: 2.3rem;
+    width: calc(118px * var(--stage-scale));
+    height: calc(118px * var(--stage-scale));
+    font-size: calc(3.4rem * var(--stage-scale));
   }
 
   .stage-controls {

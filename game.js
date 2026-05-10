@@ -890,12 +890,14 @@ function scaledPiecePx(value, scale = getStagePieceScale()) {
 function setupStageResizeHandler() {
   if (!stageEl) return;
 
+  updateStageScale();
   let lastWidth = stageEl.getBoundingClientRect().width;
   const rerenderPieces = () => {
     if (isAnimating) return;
     const width = stageEl.getBoundingClientRect().width;
     if (Math.abs(width - lastWidth) < 2) return;
     lastWidth = width;
+    updateStageScale();
     renderPieces();
   };
 
@@ -905,6 +907,10 @@ function setupStageResizeHandler() {
   } else {
     window.addEventListener("resize", rerenderPieces);
   }
+}
+
+function updateStageScale() {
+  stageEl.style.setProperty("--stage-scale", getStagePieceScale());
 }
 
 function getStackSpread(stackIndex, id) {

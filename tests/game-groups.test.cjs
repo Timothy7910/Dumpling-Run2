@@ -41,3 +41,13 @@ test("B group has behavior hooks for its custom dice and movement rules", () => 
   assert.match(script, /applyGroupBTurnRules/);
   assert.match(script, /applyGroupBAfterMoveRules/);
 });
+
+test("stage overlay controls scale with the map on narrow screens", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(script, /--stage-scale/);
+  assert.match(script, /updateStageScale/);
+  assert.match(styles, /\.dice[\s\S]*--stage-scale/);
+  assert.match(styles, /\.stage-controls[\s\S]*--stage-scale/);
+});
