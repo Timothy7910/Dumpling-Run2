@@ -1,0 +1,61 @@
+<h2>黑马值买入区间图表方向</h2>
+<p class="subtitle">目标：用胜率 × 黑马值倍率，给每个团子显示适合买入的倍率区间。点击你喜欢的呈现方式。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px">
+      <div style="display:grid;gap:12px">
+        <div style="display:flex;justify-content:space-between;font-weight:800;color:#23344a">
+          <span>菲比</span><span>建议：1.55x 以上</span>
+        </div>
+        <div style="height:22px;border-radius:999px;background:linear-gradient(90deg,#dfe7ea 0 42%,#f2c15d 42% 70%,#39b6bd 70% 100%)"></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#667">1.0x<span>观望</span><span>可买</span><span>推荐</span>2.0x</div>
+        <div style="display:flex;justify-content:space-between;font-weight:800;color:#23344a">
+          <span>陆・赫斯</span><span>建议：1.75x 以上</span>
+        </div>
+        <div style="height:22px;border-radius:999px;background:linear-gradient(90deg,#dfe7ea 0 55%,#f2c15d 55% 82%,#75ba78 82% 100%)"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 每只团子一条买入区间</h3>
+      <p>最直观，直接告诉玩家倍率到哪里才值得买。适合放在胜率模拟旁边。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px">
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;align-items:end;height:180px">
+        <div style="height:105px;background:#d9a244;border-radius:10px 10px 4px 4px"></div>
+        <div style="height:135px;background:#36aab3;border-radius:10px 10px 4px 4px"></div>
+        <div style="height:120px;background:#8e75d8;border-radius:10px 10px 4px 4px"></div>
+        <div style="height:96px;background:#5f91dd;border-radius:10px 10px 4px 4px"></div>
+        <div style="height:90px;background:#df7184;border-radius:10px 10px 4px 4px"></div>
+        <div style="height:112px;background:#75ba78;border-radius:10px 10px 4px 4px"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 期望收益排行榜</h3>
+      <p>用当前黑马值计算谁最划算。适合玩家输入倍率后，马上排序出推荐买谁。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px">
+      <div style="display:grid;grid-template-columns:80px 1fr;gap:10px;align-items:center">
+        <b style="color:#75ba78">陆・赫斯</b><div style="height:26px;background:linear-gradient(90deg,#eef3f5 0 70%,#75ba78 70% 100%);border-radius:999px"></div>
+        <b style="color:#df7184">卡提希娅</b><div style="height:26px;background:linear-gradient(90deg,#eef3f5 0 62%,#df7184 62% 100%);border-radius:999px"></div>
+        <b style="color:#36aab3">菲比</b><div style="height:26px;background:linear-gradient(90deg,#eef3f5 0 46%,#36aab3 46% 100%);border-radius:999px"></div>
+        <b style="color:#d9a244">达妮娅</b><div style="height:26px;background:linear-gradient(90deg,#eef3f5 0 36%,#d9a244 36% 100%);border-radius:999px"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 黑马专用热区</h3>
+      <p>重点找「胜率不高但倍率补偿够高」的低买高赔目标。适合做成活动攻略图。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我建议</h3>
+  <p>采用 A + B：每个团子显示买入区间，同时在输入当前黑马值后给出期望收益排序。C 可以作为补充标签显示“黑马机会”。</p>
+</div>

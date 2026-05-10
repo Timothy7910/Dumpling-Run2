@@ -1,0 +1,22 @@
+{
+  "name": "dango-race-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build-static.js",
+    "studio": "remotion studio",
+    "still": "remotion still DangoRace --frame=150 --scale=0.35",
+    "render": "remotion render DangoRace out/dango-race.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.367",
+    "remotion": "^4.0.367",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.0"
+  }
+}

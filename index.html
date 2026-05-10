@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>團子快跑</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="game-body">
+    <main class="app">
+      <section class="topbar" aria-labelledby="title">
+        <div>
+          <p class="eyebrow">互動版・圓形賽道</p>
+          <div class="title-row">
+            <h1 id="title">團子快跑</h1>
+            <select id="groupSelect" class="group-select" aria-label="小組切換">
+              <option value="a">A組</option>
+              <option value="b">B組</option>
+            </select>
+          </div>
+        </div>
+        <div class="controls" aria-label="遊戲控制">
+          <button id="newGameButton" type="button">新比賽</button>
+        </div>
+      </section>
+
+      <section class="play-layout">
+        <div class="stage-panel">
+          <div class="stage-head">
+            <div>
+              <h2>32 格圓形賽道</h2>
+              <p id="turnInfo">準備開始</p>
+            </div>
+            <span id="roundInfo" class="pill">第 1 回合</span>
+          </div>
+
+          <div id="stage" class="stage" aria-label="圓形賽道遊戲區">
+            <div class="stage-controls" aria-label="回合控制">
+              <button id="stepButton" type="button">擲下一顆</button>
+              <button id="autoButton" type="button">自動跑完</button>
+            </div>
+            <div class="track-ring" aria-hidden="true"></div>
+            <div id="cells" class="cells"></div>
+            <div id="pieces" class="pieces"></div>
+            <div id="movers" class="movers"></div>
+            <div id="dice" class="dice" aria-live="polite">?</div>
+            <div id="skillNotice" class="skill-notice" aria-live="polite" hidden></div>
+            <div id="spotlight" class="spotlight" aria-live="polite" hidden></div>
+          </div>
+        </div>
+
+        <aside class="side-panel">
+          <div class="panel-head">
+            <h2>本場順位</h2>
+            <span class="subtle">布大王不排名</span>
+          </div>
+          <div id="players" class="players"></div>
+        </aside>
+      </section>
+
+      <section class="lower-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>事件紀錄</h2>
+            <button id="clearLogButton" class="ghost" type="button">清空</button>
+          </div>
+          <div id="log" class="log" aria-live="polite"></div>
+        </div>
+
+        <div class="panel sim-panel">
+          <div class="panel-head">
+            <h2>勝率模擬</h2>
+            <span class="subtle">大量快速模擬</span>
+          </div>
+          <div class="sim-controls">
+            <label>
+              模擬場數
+              <input id="simCount" type="number" min="100" max="100000" step="100" value="5000">
+            </label>
+            <button id="simulateButton" type="button">計算勝率</button>
+          </div>
+          <div id="simResults" class="sim-results"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="endModal" class="end-modal" role="dialog" aria-modal="true" aria-labelledby="endTitle" hidden>
+      <div class="end-card">
+        <h2 id="endTitle">比賽結果</h2>
+        <div id="endRankings" class="end-rankings"></div>
+        <button id="endOkButton" type="button">確認</button>
+      </div>
+    </div>
+
+    <script src="track-data.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>

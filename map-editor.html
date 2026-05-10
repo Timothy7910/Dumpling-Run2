@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>地圖標註工具</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="editor-body">
+    <main class="map-editor">
+      <header class="editor-topbar">
+        <div>
+          <p class="eyebrow">32 格地圖標註</p>
+          <h1>點選每一格</h1>
+        </div>
+        <nav class="editor-actions" aria-label="地圖操作">
+          <a class="text-button" href="index.html">回到遊戲</a>
+          <button id="undoButton" type="button">復原</button>
+          <button id="clearButton" class="ghost" type="button">清空</button>
+          <button id="saveButton" type="button">套用到遊戲</button>
+        </nav>
+      </header>
+
+      <section class="editor-layout">
+        <div class="map-workbench">
+          <div id="mapCanvas" class="map-canvas" aria-label="點選地圖上的 32 個格子">
+            <img src="public/maps/reference-map.png" alt="待標註的遊戲地圖">
+            <div id="markerLayer" class="marker-layer"></div>
+          </div>
+        </div>
+
+        <aside class="editor-panel">
+          <div class="counter">
+            <span id="pointCount">0</span>
+            <small>/ 32</small>
+          </div>
+          <p id="statusText" class="editor-status">請從起點開始，依路徑順序點選第 1 格。</p>
+
+          <div class="type-tools" aria-label="格子類型">
+            <button data-type="normal" class="type-button active" type="button">普通</button>
+            <button data-type="advance" class="type-button advance" type="button">前進 +</button>
+            <button data-type="block" class="type-button block" type="button">後退 -</button>
+            <button data-type="time" class="type-button time" type="button">裂隙 T</button>
+            <button data-type="finish" class="type-button finish" type="button">終點 F</button>
+          </div>
+
+          <div class="editor-help">
+            <p>操作方式</p>
+            <ol>
+              <li>照賽道順序點滿 32 格。</li>
+              <li>點任一標記，再按右側類型或鍵盤 N / + / - / T / F。</li>
+              <li>按「套用到遊戲」後，回到遊戲頁重新整理即可使用新地圖。</li>
+            </ol>
+          </div>
+
+          <label class="export-box">
+            匯出 JSON
+            <textarea id="exportText" spellcheck="false"></textarea>
+          </label>
+          <button id="copyButton" class="ghost" type="button">複製 JSON</button>
+        </aside>
+      </section>
+    </main>
+
+    <script src="track-data.js"></script>
+    <script>
+      const canvas = document.querySelector("#mapCanvas");
+      const markerLayer = document.querySelector("#markerLayer");
+      const pointCount = document.querySelector("#pointCount");
+      const statusText = document.querySelector("#statusText");
+      const exportText = document.querySelector("#exportText");
+      const typeButtons = [...document.querySelectorAll(".type-button")];
+
+      const backgroundImage = "public/maps/reference-map.png";
+      const maxPoints = window.DangoTrack.TRACK_LENGTH;
+      let points = [];
+      let selectedIndex = null;
+
+      initFromStorage();
+      render();
+
+      canvas.addEventListener("click", (event) => {
+        if (event.target.closest(".map-marker")) return;
+        if (points.length >= maxPoints) {
+          setStatus("已經標滿 32 格。點選標記可調整格子類型。");
+          return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 100;
+        const y = ((event.clientY - rect.top) / rect.height) * 100;
+        points.push({ index: points.length + 1, x, y, type: "normal" });
+        selectedIndex = points.length;
+        render();
+      });
+
+      document.querySelector("#undoButton").addEventListener("click", () => {
+        points.pop();
+        selectedIndex = points.length || null;
+        render();
+      });
+
+      document.querySelector("#clearButton").addEventListener("click", () => {
+        points = [];
+        selectedIndex = null;
+        render();
+      });
+
+      document.querySelector("#saveButton").addEventListener("click", () => {
+        if (points.length !== maxPoints) {
+          setStatus("需要先標滿 32 格，才能套用到遊戲。");
+          return;
+        }
+        const config = buildConfig();
+        window.localStorage.setItem(window.DangoTrack.STORAGE_KEY, window.DangoTrack.serializeTrackConfig(config));
+        setStatus("已套用到遊戲。回到遊戲頁重新整理即可看到新地圖。");
+      });
+
+      document.querySelector("#copyButton").addEventListener("click", async () => {
+        exportText.select();
+        try {
+          await navigator.clipboard.writeText(exportText.value);
+          setStatus("JSON 已複製。");
+        } catch (error) {
+          document.execCommand("copy");
+          setStatus("JSON 已選取並嘗試複製。");
+        }
+      });
+
+      typeButtons.forEach((button) => {
+        button.addEventListener("click", () => setSelectedType(button.dataset.type));
+      });
+
+      window.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase();
+        const type = { n: "normal", "+": "advance", "-": "block", t: "time", f: "finish" }[key];
+        if (type) setSelectedType(type);
+      });
+
+      function initFromStorage() {
+        const saved = window.DangoTrack.loadTrackConfig(window.localStorage);
+        if (!saved.backgroundImage) return;
+        points = saved.points.map((point) => ({
+          ...point,
+          type: getPointType(point.index, saved),
+        }));
+        selectedIndex = points.length ? 1 : null;
+      }
+
+      function render() {
+        markerLayer.innerHTML = "";
+        points.forEach((point) => {
+          const marker = document.createElement("button");
+          marker.type = "button";
+          marker.className = `map-marker ${point.type || "normal"} ${point.index === selectedIndex ? "selected" : ""}`;
+          marker.style.left = `${point.x}%`;
+          marker.style.top = `${point.y}%`;
+          marker.textContent = point.index;
+          marker.title = `第 ${point.index} 格`;
+          marker.addEventListener("click", () => {
+            selectedIndex = point.index;
+            render();
+          });
+          markerLayer.appendChild(marker);
+        });
+
+        pointCount.textContent = points.length;
+        exportText.value = points.length === maxPoints ? window.DangoTrack.serializeTrackConfig(buildConfig()) : serializePartialConfig();
+        updateTypeButtons();
+        if (points.length < maxPoints) setStatus(`請點選第 ${points.length + 1} 格。`);
+        else setStatus("32 格已標滿。可調整類型，或套用到遊戲。");
+      }
+
+      function setSelectedType(type) {
+        if (!selectedIndex) {
+          setStatus("請先點選一個已標註的格子。");
+          return;
+        }
+        const point = points[selectedIndex - 1];
+        point.type = type;
+        if (type === "finish") {
+          points.forEach((item) => {
+            if (item !== point && item.type === "finish") item.type = "normal";
+          });
+        }
+        render();
+      }
+
+      function buildConfig() {
+        const finishPoint = points.find((point) => point.type === "finish");
+        return {
+          length: maxPoints,
+          version: window.DangoTrack.TRACK_VERSION,
+          finish: finishPoint ? finishPoint.index : maxPoints,
+          backgroundImage,
+          points: points.map(({ index, x, y }) => ({ index, x, y })),
+          advanceCells: points.filter((point) => point.type === "advance").map((point) => point.index),
+          blockCells: points.filter((point) => point.type === "block").map((point) => point.index),
+          timeCells: points.filter((point) => point.type === "time").map((point) => point.index),
+        };
+      }
+
+      function serializePartialConfig() {
+        if (!points.length) return "";
+        return JSON.stringify(
+          {
+            length: maxPoints,
+            version: window.DangoTrack.TRACK_VERSION,
+            finish: points.find((point) => point.type === "finish")?.index || maxPoints,
+            backgroundImage,
+            points: points.map(({ index, x, y }) => ({ index, x, y })),
+            advanceCells: points.filter((point) => point.type === "advance").map((point) => point.index),
+            blockCells: points.filter((point) => point.type === "block").map((point) => point.index),
+            timeCells: points.filter((point) => point.type === "time").map((point) => point.index),
+          },
+          null,
+          2
+        );
+      }
+
+      function getPointType(index, config) {
+        if (index === config.finish) return "finish";
+        if (config.advanceCells.has(index)) return "advance";
+        if (config.blockCells.has(index)) return "block";
+        if (config.timeCells.has(index)) return "time";
+        return "normal";
+      }
+
+      function updateTypeButtons() {
+        const selected = selectedIndex ? points[selectedIndex - 1] : null;
+        typeButtons.forEach((button) => {
+          button.classList.toggle("active", selected && selected.type === button.dataset.type);
+        });
+      }
+
+      function setStatus(message) {
+        statusText.textContent = message;
+      }
+    </script>
+  </body>
+</html>

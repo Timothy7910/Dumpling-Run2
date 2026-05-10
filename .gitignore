@@ -1,0 +1,11 @@
+node_modules/
+out/
+.remotion/
+*.log
+*.err
+*.pid
+*.job
+dist/
+build/
+.DS_Store
+Thumbs.db
