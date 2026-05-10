@@ -8,6 +8,8 @@ const PLAYER_IDS = ["lu", "west", "daphne", "snow", "kat", "fei"];
 const ALL_IDS = [...PLAYER_IDS, "boss"];
 const GROUP_STORAGE_KEY = "dango-race-group";
 const DEFAULT_GROUP_ID = "b";
+const PIECE_REFERENCE_STAGE_WIDTH = 1040;
+const MIN_PIECE_STAGE_SCALE = 0.34;
 
 const COLORS = {
   lu: "#75ba78",
@@ -144,6 +146,7 @@ const groupSelectEl = document.querySelector("#groupSelect");
 
 applyTrackBackground();
 setupGroupSelect();
+setupStageResizeHandler();
 
 document.querySelector("#newGameButton").addEventListener("click", () => {
   stopAuto();
@@ -863,15 +866,45 @@ function runSimulation() {
 
 function setPieceVars(el, point, stackIndex, id, z) {
   const spread = getStackSpread(stackIndex, id);
+  const pieceScale = getStagePieceScale();
   el.style.setProperty("--x", point.x);
   el.style.setProperty("--y", point.y);
-  el.style.setProperty("--lift", `${spread.lift}px`);
+  el.style.setProperty("--lift", scaledPiecePx(spread.lift, pieceScale));
   el.style.setProperty("--z", z);
   el.style.setProperty("--scale", id === "boss" ? 0.72 : 0.64);
-  el.style.setProperty("--size", id === "boss" ? "210px" : "190px");
-  el.style.setProperty("--height", id === "boss" ? "132px" : "142px");
-  el.style.setProperty("--dx", `${spread.dx}px`);
-  el.style.setProperty("--dy", `${spread.dy}px`);
+  el.style.setProperty("--size", scaledPiecePx(id === "boss" ? 210 : 190, pieceScale));
+  el.style.setProperty("--height", scaledPiecePx(id === "boss" ? 132 : 142, pieceScale));
+  el.style.setProperty("--dx", scaledPiecePx(spread.dx, pieceScale));
+  el.style.setProperty("--dy", scaledPiecePx(spread.dy, pieceScale));
+}
+
+function getStagePieceScale() {
+  const width = stageEl?.getBoundingClientRect().width || PIECE_REFERENCE_STAGE_WIDTH;
+  return Math.min(1, Math.max(MIN_PIECE_STAGE_SCALE, width / PIECE_REFERENCE_STAGE_WIDTH));
+}
+
+function scaledPiecePx(value, scale = getStagePieceScale()) {
+  return `${Number((value * scale).toFixed(2))}px`;
+}
+
+function setupStageResizeHandler() {
+  if (!stageEl) return;
+
+  let lastWidth = stageEl.getBoundingClientRect().width;
+  const rerenderPieces = () => {
+    if (isAnimating) return;
+    const width = stageEl.getBoundingClientRect().width;
+    if (Math.abs(width - lastWidth) < 2) return;
+    lastWidth = width;
+    renderPieces();
+  };
+
+  if ("ResizeObserver" in window) {
+    const observer = new ResizeObserver(rerenderPieces);
+    observer.observe(stageEl);
+  } else {
+    window.addEventListener("resize", rerenderPieces);
+  }
 }
 
 function getStackSpread(stackIndex, id) {
