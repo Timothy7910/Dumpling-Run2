@@ -56,6 +56,13 @@ test("stage overlay controls scale with the map on narrow screens", () => {
   assert.match(styles, /\.cell[\s\S]*--stage-scale/);
 });
 
+test("custom map keeps coordinate overlays aligned on mobile", () => {
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(styles, /\.game-body \.stage\.custom-map[\s\S]*background:[\s\S]*100% 100% no-repeat/);
+  assert.doesNotMatch(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.stage\.custom-map\s*\{[\s\S]*height:\s*100%/);
+});
+
 test("custom group can select six racers from both groups", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
