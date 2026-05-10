@@ -20,6 +20,7 @@
           </div>
         </div>
         <div class="controls" aria-label="遊戲控制">
+          <button id="customGroupButton" class="ghost custom-group-button" type="button">自訂</button>
           <button id="newGameButton" type="button">新比賽</button>
         </div>
       </section>
@@ -44,8 +45,6 @@
             <div id="pieces" class="pieces"></div>
             <div id="movers" class="movers"></div>
             <div id="dice" class="dice" aria-live="polite">?</div>
-            <div id="skillNotice" class="skill-notice" aria-live="polite" hidden></div>
-            <div id="spotlight" class="spotlight" aria-live="polite" hidden></div>
           </div>
         </div>
 
@@ -89,6 +88,23 @@
         <h2 id="endTitle">比賽結果</h2>
         <div id="endRankings" class="end-rankings"></div>
         <button id="endOkButton" type="button">確認</button>
+      </div>
+    </div>
+
+    <div id="customModal" class="custom-modal" role="dialog" aria-modal="true" aria-labelledby="customTitle" hidden>
+      <div class="custom-card">
+        <div class="custom-head">
+          <div>
+            <h2 id="customTitle">自訂參賽團子</h2>
+            <p>從 A 組與 B 組共 12 顆中選 6 顆</p>
+          </div>
+          <span id="customCount" class="pill">0/6</span>
+        </div>
+        <div id="customGrid" class="custom-grid"></div>
+        <div class="custom-actions">
+          <button id="customCancelButton" class="ghost" type="button">取消</button>
+          <button id="customSaveButton" type="button" disabled>開始自訂比賽</button>
+        </div>
       </div>
     </div>
 

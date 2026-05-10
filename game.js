@@ -5,8 +5,10 @@ const ADVANCE_CELLS = TRACK_CONFIG.advanceCells;
 const BLOCK_CELLS = TRACK_CONFIG.blockCells;
 const TIME_CELLS = TRACK_CONFIG.timeCells;
 const PLAYER_IDS = ["lu", "west", "daphne", "snow", "kat", "fei"];
-const ALL_IDS = [...PLAYER_IDS, "boss"];
+const CUSTOM_GROUP_ID = "custom";
+const CUSTOM_SELECTION_SIZE = 6;
 const GROUP_STORAGE_KEY = "dango-race-group";
+const CUSTOM_GROUP_STORAGE_KEY = "dango-race-custom-selection";
 const DEFAULT_GROUP_ID = "b";
 const PIECE_REFERENCE_STAGE_WIDTH = 1040;
 const MIN_PIECE_STAGE_SCALE = 0.34;
@@ -130,8 +132,6 @@ const cellsEl = document.querySelector("#cells");
 const piecesEl = document.querySelector("#pieces");
 const moversEl = document.querySelector("#movers");
 const diceEl = document.querySelector("#dice");
-const spotlightEl = document.querySelector("#spotlight");
-const skillNoticeEl = document.querySelector("#skillNotice");
 const playersEl = document.querySelector("#players");
 const logEl = document.querySelector("#log");
 const turnInfoEl = document.querySelector("#turnInfo");
@@ -143,9 +143,16 @@ const stepButton = document.querySelector("#stepButton");
 const autoButton = document.querySelector("#autoButton");
 const endOkButton = document.querySelector("#endOkButton");
 const groupSelectEl = document.querySelector("#groupSelect");
+const customGroupButton = document.querySelector("#customGroupButton");
+const customModalEl = document.querySelector("#customModal");
+const customGridEl = document.querySelector("#customGrid");
+const customCountEl = document.querySelector("#customCount");
+const customSaveButton = document.querySelector("#customSaveButton");
+const customCancelButton = document.querySelector("#customCancelButton");
 
 applyTrackBackground();
 setupGroupSelect();
+setupCustomPicker();
 setupStageResizeHandler();
 
 document.querySelector("#newGameButton").addEventListener("click", () => {
@@ -185,22 +192,29 @@ endOkButton.addEventListener("click", closeEndModal);
 
 function setupGroupSelect() {
   if (!groupSelectEl) return;
-  groupSelectEl.value = activeGroupId;
+  groupSelectEl.value = GROUPS[activeGroupId] ? activeGroupId : DEFAULT_GROUP_ID;
+  updateGroupControls();
   groupSelectEl.addEventListener("change", () => {
-    activeGroupId = GROUPS[groupSelectEl.value] ? groupSelectEl.value : "a";
+    activeGroupId = normalizeGroupId(groupSelectEl.value);
     window.localStorage?.setItem(GROUP_STORAGE_KEY, activeGroupId);
     stopAuto();
     closeEndModal();
     game = createGame();
     diceEl.textContent = "?";
     simResultsEl.innerHTML = "";
+    updateGroupControls();
     render();
   });
+  customGroupButton?.addEventListener("click", openCustomPicker);
 }
 
 function loadActiveGroupId() {
   const saved = window.localStorage?.getItem(GROUP_STORAGE_KEY);
-  return saved === DEFAULT_GROUP_ID ? saved : DEFAULT_GROUP_ID;
+  return normalizeGroupId(saved || DEFAULT_GROUP_ID);
+}
+
+function normalizeGroupId(id) {
+  return GROUPS[id] || id === CUSTOM_GROUP_ID ? id : DEFAULT_GROUP_ID;
 }
 
 function activeGroup() {
@@ -208,17 +222,136 @@ function activeGroup() {
 }
 
 function playerConfig(id) {
-  return activeGroup().players[id] || GROUPS.a.players[id] || {};
+  if (id === "boss") return activeGroup().players.boss || GROUPS.a.players.boss || {};
+  const source = racerSourceGroup(id);
+  const slot = racerSlot(id);
+  return GROUPS[source]?.players[slot] || GROUPS.a.players[slot] || {};
 }
 
-function isGroupB() {
-  return activeGroupId === "b";
+function racerSourceGroup(id) {
+  if (id.includes(":")) return id.split(":")[0];
+  return activeGroupId === CUSTOM_GROUP_ID ? "a" : activeGroupId;
+}
+
+function racerSlot(id) {
+  return id.includes(":") ? id.split(":")[1] : id;
+}
+
+function isGroupB(id) {
+  return racerSourceGroup(id) === "b";
+}
+
+function activePlayerIds() {
+  if (activeGroupId !== CUSTOM_GROUP_ID) return [...PLAYER_IDS];
+  return loadCustomSelection();
+}
+
+function getCustomRacerOptions() {
+  return ["a", "b"].flatMap((groupId) =>
+    PLAYER_IDS.map((slot) => ({
+      id: `${groupId}:${slot}`,
+      groupId,
+      slot,
+      ...GROUPS[groupId].players[slot],
+    }))
+  );
+}
+
+function loadCustomSelection() {
+  const fallback = getCustomRacerOptions().slice(6, 12).map((option) => option.id);
+  try {
+    const parsed = JSON.parse(window.localStorage?.getItem(CUSTOM_GROUP_STORAGE_KEY) || "[]");
+    const valid = getCustomRacerOptions().map((option) => option.id);
+    const selected = Array.isArray(parsed) ? parsed.filter((id) => valid.includes(id)) : [];
+    return selected.length === CUSTOM_SELECTION_SIZE ? selected : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function colorFor(id) {
+  return COLORS[racerSlot(id)] || COLORS.boss;
+}
+
+function setupCustomPicker() {
+  if (!customModalEl || !customGridEl) return;
+  customGridEl.innerHTML = "";
+  const selected = new Set(loadCustomSelection());
+  for (const option of getCustomRacerOptions()) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "custom-racer";
+    button.dataset.id = option.id;
+    button.innerHTML = `
+      <span class="custom-racer-group">${option.groupId.toUpperCase()}</span>
+      <img src="${option.asset}" alt="${option.name}">
+      <span>${option.name}</span>
+    `;
+    button.addEventListener("click", () => {
+      const current = getCustomPickerSelection();
+      if (current.has(option.id)) {
+        current.delete(option.id);
+      } else if (current.size < CUSTOM_SELECTION_SIZE) {
+        current.add(option.id);
+      }
+      renderCustomPickerSelection(current);
+    });
+    customGridEl.appendChild(button);
+  }
+  customSaveButton?.addEventListener("click", saveCustomSelection);
+  customCancelButton?.addEventListener("click", closeCustomPicker);
+  customModalEl.addEventListener("click", (event) => {
+    if (event.target === customModalEl) closeCustomPicker();
+  });
+  renderCustomPickerSelection(selected);
+}
+
+function openCustomPicker() {
+  renderCustomPickerSelection(new Set(loadCustomSelection()));
+  customModalEl.hidden = false;
+}
+
+function closeCustomPicker() {
+  if (!customModalEl) return;
+  customModalEl.hidden = true;
+}
+
+function getCustomPickerSelection() {
+  const selected = new Set();
+  customGridEl?.querySelectorAll(".custom-racer.selected").forEach((button) => selected.add(button.dataset.id));
+  return selected;
+}
+
+function renderCustomPickerSelection(selected) {
+  customGridEl?.querySelectorAll(".custom-racer").forEach((button) => {
+    button.classList.toggle("selected", selected.has(button.dataset.id));
+    button.disabled = !selected.has(button.dataset.id) && selected.size >= CUSTOM_SELECTION_SIZE;
+  });
+  if (customCountEl) customCountEl.textContent = `${selected.size}/${CUSTOM_SELECTION_SIZE}`;
+  if (customSaveButton) customSaveButton.disabled = selected.size !== CUSTOM_SELECTION_SIZE;
+}
+
+function saveCustomSelection() {
+  const selected = [...getCustomPickerSelection()];
+  if (selected.length !== CUSTOM_SELECTION_SIZE) return;
+  window.localStorage?.setItem(CUSTOM_GROUP_STORAGE_KEY, JSON.stringify(selected));
+  activeGroupId = CUSTOM_GROUP_ID;
+  window.localStorage?.setItem(GROUP_STORAGE_KEY, activeGroupId);
+  stopAuto();
+  closeEndModal();
+  game = createGame();
+  diceEl.textContent = "?";
+  simResultsEl.innerHTML = "";
+  closeCustomPicker();
+  updateGroupControls();
+  render();
 }
 
 function createGame() {
+  const playerIds = activePlayerIds();
   const stacks = Array.from({ length: TRACK_LENGTH + 1 }, () => []);
   const players = {};
-  for (const id of PLAYER_IDS) {
+  for (const id of playerIds) {
     players[id] = {
       id,
       position: 1,
@@ -230,7 +363,7 @@ function createGame() {
       hasMoved: false,
     };
   }
-  const firstQueue = shuffle(PLAYER_IDS);
+  const firstQueue = shuffle(playerIds);
   stacks[1].push(...[...firstQueue].reverse());
   players.boss = {
     id: "boss",
@@ -242,6 +375,7 @@ function createGame() {
 
   const state = {
     players,
+    playerIds,
     stacks,
     round: 1,
     queue: firstQueue,
@@ -298,10 +432,10 @@ function beginRound(state, withLog) {
     addLog(state, "第 3 回合，布大王從終點開始往起點移動。", withLog);
   }
 
-  for (const id of PLAYER_IDS) state.players[id].westMarked = false;
-  if (!isGroupB()) markWestTargets(state, withLog);
+  for (const id of state.playerIds) state.players[id].westMarked = false;
+  markWestTargets(state, withLog);
 
-  const active = PLAYER_IDS.filter((id) => !state.players[id].finished);
+  const active = state.playerIds.filter((id) => !state.players[id].finished);
   if (state.players.boss.active) active.push("boss");
   state.queue = shuffle(active);
   prepareRoundRolls(state);
@@ -309,20 +443,22 @@ function beginRound(state, withLog) {
 }
 
 function markWestTargets(state, withLog) {
-  const west = state.players.west;
+  const westId = state.playerIds.find((id) => racerSlot(id) === "west" && !isGroupB(id));
+  if (!westId) return;
+  const west = state.players[westId];
   if (west.finished || state.round === 1) return;
   const ranking = getRaceRanking(state);
-  const westRank = ranking.indexOf("west");
+  const westRank = ranking.indexOf(westId);
   if (westRank <= 0) return;
   const candidates = ranking.slice(Math.max(0, westRank - 2), westRank);
   for (const id of candidates) state.players[id].westMarked = true;
   if (candidates.length) {
-    addLog(state, `西格莉卡發動「${SKILL_NAMES.west}」，標記 ${candidates.map((id) => NAMES[id]).join("、")}，本回合移動少 1 格。`, withLog);
+    addLog(state, `西格莉卡發動「${SKILL_NAMES[westId]}」，標記 ${candidates.map((id) => NAMES[id]).join("、")}，本回合移動少 1 格。`, withLog);
   }
 }
 
 function getRaceRanking(state) {
-  return PLAYER_IDS
+  return state.playerIds
     .filter((id) => !state.players[id].finished)
     .sort((a, b) => compareStanding(state, a, b));
 }
@@ -334,12 +470,11 @@ function compareStanding(state, a, b) {
   const aIndex = stack.indexOf(a);
   const bIndex = stack.indexOf(b);
   if (aIndex >= 0 && bIndex >= 0) return bIndex - aIndex;
-  return PLAYER_IDS.indexOf(a) - PLAYER_IDS.indexOf(b);
+  return state.playerIds.indexOf(a) - state.playerIds.indexOf(b);
 }
 
 function prepareRoundRolls(state) {
   state.plannedRolls = {};
-  if (!isGroupB()) return;
   for (const id of state.queue) {
     if (id !== "boss") state.plannedRolls[id] = rollDirectForPlayer(state, id);
   }
@@ -353,13 +488,14 @@ function rollForPlayer(state, id) {
 
 function rollDirectForPlayer(state, id) {
   const actor = state.players[id];
-  if (isGroupB() && id === "west") {
+  const slot = racerSlot(id);
+  if (isGroupB(id) && slot === "west") {
     const cycle = [3, 2, 1];
     const index = actor.precisionIndex || 0;
     actor.precisionIndex = index + 1;
     return cycle[index % cycle.length];
   }
-  if (isGroupB() && id === "kat") {
+  if (isGroupB(id) && slot === "kat") {
     return Math.random() < 0.5 ? 2 : 3;
   }
   return rollDie();
@@ -372,29 +508,30 @@ function takeTurn(state, id, withLog) {
   const reasons = [`擲出 ${roll}`];
 
   if (id !== "boss") {
-    if (isGroupB()) {
+    if (isGroupB(id)) {
       delta = applyGroupBTurnRules(state, id, roll, delta, reasons);
     } else {
-      if (id === "daphne" && actor.lastRoll === roll) {
+      const slot = racerSlot(id);
+      if (slot === "daphne" && actor.lastRoll === roll) {
         delta += 2;
-        reasons.push(`${SKILL_NAMES.daphne}：連骰同點 +2`);
+        reasons.push(`${SKILL_NAMES[id]}：連骰同點 +2`);
       }
-      if (id === "snow" && actor.metBoss) {
+      if (slot === "snow" && actor.metBoss) {
         delta += 1;
-        reasons.push(`${SKILL_NAMES.snow}：遇過布大王 +1`);
+        reasons.push(`${SKILL_NAMES[id]}：遇過布大王 +1`);
       }
-      if (id === "fei" && Math.random() < 0.5) {
+      if (slot === "fei" && Math.random() < 0.5) {
         delta += 1;
-        reasons.push(`${SKILL_NAMES.fei}：額外前進 +1`);
+        reasons.push(`${SKILL_NAMES[id]}：額外前進 +1`);
       }
-      if (id === "kat" && actor.katUsed && Math.random() < 0.6) {
+      if (slot === "kat" && actor.katUsed && Math.random() < 0.6) {
         delta += 2;
-        reasons.push(`${SKILL_NAMES.kat}：落後奮起 +2`);
+        reasons.push(`${SKILL_NAMES[id]}：落後奮起 +2`);
       }
     }
     if (actor.westMarked) {
       delta = Math.max(0, delta - 1);
-      reasons.push(`${SKILL_NAMES.west}：標記 -1`);
+      reasons.push(`標記 -1`);
     }
   }
 
@@ -404,9 +541,9 @@ function takeTurn(state, id, withLog) {
   applyLandingRules(state, moved.carried, withLog, reasons);
   applyGroupBAfterMoveRules(state, moved.carried, moved.from, reasons);
   actor.hasMoved = true;
-  if (!isGroupB() && id === "kat" && !actor.katUsed && actor.position < FINISH && isLastPlace(state, id)) {
+  if (!isGroupB(id) && racerSlot(id) === "kat" && !actor.katUsed && actor.position < FINISH && isLastPlace(state, id)) {
     actor.katUsed = true;
-    reasons.push(`${SKILL_NAMES.kat}：落後狀態啟動`);
+    reasons.push(`${SKILL_NAMES[id]}：落後狀態啟動`);
   }
   const finalTo = state.players[id].position;
   const event = {
@@ -427,50 +564,52 @@ function takeTurn(state, id, withLog) {
 }
 
 function applyGroupBTurnRules(state, id, roll, delta, reasons) {
-  if (id === "lu") {
+  const slot = racerSlot(id);
+  if (slot === "lu") {
     const rolls = Object.values(state.plannedRolls || {});
     if (roll === Math.min(...rolls)) {
-      reasons.push(`${SKILL_NAMES.lu}：本輪最小點數 +2`);
+      reasons.push(`${SKILL_NAMES[id]}：本輪最小點數 +2`);
       return delta + 2;
     }
   }
-  if (id === "west") {
-    reasons.push(`${SKILL_NAMES.west}：固定循環點數`);
+  if (slot === "west") {
+    reasons.push(`${SKILL_NAMES[id]}：固定循環點數`);
   }
-  if (id === "daphne") {
+  if (slot === "daphne") {
     const chance = Math.random();
     if (chance < 0.2) {
-      reasons.push(`${SKILL_NAMES.daphne}：本回合無法移動`);
+      reasons.push(`${SKILL_NAMES[id]}：本回合無法移動`);
       return 0;
     }
     if (chance < 0.8) {
-      reasons.push(`${SKILL_NAMES.daphne}：雙倍點數`);
+      reasons.push(`${SKILL_NAMES[id]}：雙倍點數`);
       return delta * 2;
     }
   }
-  if (id === "kat") {
-    reasons.push(`${SKILL_NAMES.kat}：只會擲出 2 或 3`);
+  if (slot === "kat") {
+    reasons.push(`${SKILL_NAMES[id]}：只會擲出 2 或 3`);
   }
-  if (id === "fei" && Math.random() < 0.28) {
-    reasons.push(`${SKILL_NAMES.fei}：雙倍點數`);
+  if (slot === "fei" && Math.random() < 0.28) {
+    reasons.push(`${SKILL_NAMES[id]}：雙倍點數`);
     return delta * 2;
   }
   return delta;
 }
 
 function applyGroupBAfterMoveRules(state, movedIds, from, reasons) {
-  if (!isGroupB() || movedIds[0] !== "snow") return;
-  const actor = state.players.snow;
+  const leader = movedIds[0];
+  if (!isGroupB(leader) || racerSlot(leader) !== "snow") return;
+  const actor = state.players[leader];
   const midpoint = Math.ceil(FINISH / 2);
   if (actor.electronicGhostUsed || actor.position <= midpoint || actor.position >= FINISH) return;
-  const targetPosition = PLAYER_IDS
-    .filter((id) => id !== "snow" && !state.players[id].finished && state.players[id].position > actor.position)
+  const targetPosition = state.playerIds
+    .filter((id) => id !== leader && !state.players[id].finished && state.players[id].position > actor.position)
     .map((id) => state.players[id].position)
     .sort((a, b) => a - b)[0];
   if (!targetPosition) return;
   actor.electronicGhostUsed = true;
   teleportCarriedGroup(state, movedIds, targetPosition);
-  reasons.push(`${SKILL_NAMES.snow}：傳送到最近團子頂端`);
+  reasons.push(`${SKILL_NAMES[leader]}：傳送到最近團子頂端`);
 }
 
 function teleportCarriedGroup(state, movedIds, to) {
@@ -522,12 +661,14 @@ function applyLandingRules(state, movedIds, withLog, reasons) {
   if (actor.position >= FINISH) return;
 
   if (ADVANCE_CELLS.has(actor.position)) {
-    const bonus = !isGroupB() && leader === "lu" ? 3 : 1;
-    reasons.push(!isGroupB() && leader === "lu" ? `${SKILL_NAMES.lu}：推進裝置 +${bonus}` : `推進裝置 +${bonus}`);
+    const isALu = !isGroupB(leader) && racerSlot(leader) === "lu";
+    const bonus = isALu ? 3 : 1;
+    reasons.push(isALu ? `${SKILL_NAMES[leader]}：推進裝置 +${bonus}` : `推進裝置 +${bonus}`);
     moveWholeCarriedGroup(state, movedIds, bonus);
   } else if (BLOCK_CELLS.has(actor.position)) {
-    const penalty = !isGroupB() && leader === "lu" ? -2 : -1;
-    reasons.push(!isGroupB() && leader === "lu" ? `${SKILL_NAMES.lu}：阻退裝置 ${penalty}` : `阻退裝置 ${penalty}`);
+    const isALu = !isGroupB(leader) && racerSlot(leader) === "lu";
+    const penalty = isALu ? -2 : -1;
+    reasons.push(isALu ? `${SKILL_NAMES[leader]}：阻退裝置 ${penalty}` : `阻退裝置 ${penalty}`);
     moveWholeCarriedGroup(state, movedIds, penalty);
   } else if (leader !== "boss" && TIME_CELLS.has(actor.position)) {
     openTimeRift(state, actor.position, withLog);
@@ -622,7 +763,7 @@ function checkBossMeeting(state, ids, position) {
 }
 
 function recordFinishers(state, withLog) {
-  const finishers = PLAYER_IDS.filter((id) => !state.players[id].finished && state.players[id].position >= FINISH);
+  const finishers = state.playerIds.filter((id) => !state.players[id].finished && state.players[id].position >= FINISH);
   if (!finishers.length) return [];
   finishers.sort((a, b) => state.stacks[FINISH].indexOf(b) - state.stacks[FINISH].indexOf(a));
   for (const id of finishers) {
@@ -642,7 +783,7 @@ function isLastPlace(state, id) {
 }
 
 function getLastNonBoss(state) {
-  return PLAYER_IDS
+  return state.playerIds
     .map((id) => state.players[id])
     .filter((player) => !player.finished)
     .sort((a, b) => a.position - b.position)[0];
@@ -655,11 +796,6 @@ async function animateTurn(event) {
   diceEl.classList.add("roll");
   turnInfoEl.textContent = `${NAMES[event.id]}：${event.reasons.join("，")}`;
   await wait(420);
-  const notices = getSkillNotices(event);
-  if (notices.length) {
-    showSkillNotice(notices);
-    await wait(360);
-  }
 
   const fromPoint = cellPoint(event.from);
   const moving = event.carried.map((id, index) => {
@@ -688,41 +824,6 @@ async function animateTurn(event) {
   moving.forEach((img) => img.remove());
   hidePieces(event.carried, false);
   diceEl.classList.remove("roll");
-  hideSkillNotice();
-  if (event.newRanks && event.newRanks.includes(game.rankings[0])) {
-    await showSpotlight(game.rankings[0]);
-  }
-}
-
-function getSkillNotices(event) {
-  return event.reasons.filter((reason) => !reason.startsWith("擲出") && !reason.startsWith("初始"));
-}
-
-function showSkillNotice(notices) {
-  if (!skillNoticeEl) return;
-  skillNoticeEl.innerHTML = notices.map((text) => `<div class="skill-chip">${text}</div>`).join("");
-  skillNoticeEl.hidden = false;
-}
-
-function hideSkillNotice() {
-  if (!skillNoticeEl) return;
-  skillNoticeEl.hidden = true;
-  skillNoticeEl.innerHTML = "";
-}
-
-async function showSpotlight(id) {
-  if (!spotlightEl || !id) return;
-  spotlightEl.innerHTML = `
-    <div class="spotlight-card">
-      <div class="spotlight-rank">第 1 名</div>
-      <img src="${assetFor(id)}" alt="${NAMES[id]}">
-      <div class="spotlight-name" style="color:${COLORS[id]}">${NAMES[id]}</div>
-    </div>
-  `;
-  spotlightEl.hidden = false;
-  await wait(1350);
-  spotlightEl.hidden = true;
-  spotlightEl.innerHTML = "";
 }
 
 function buildPath(from, to) {
@@ -758,7 +859,6 @@ function renderCells() {
     cell.className = `cell ${getCellClass(i)}`;
     cell.style.setProperty("--x", point.x);
     cell.style.setProperty("--y", point.y);
-    cell.textContent = getCellType(i) || i;
     cellsEl.appendChild(cell);
   }
 }
@@ -796,7 +896,7 @@ function renderPlayers() {
       <span class="rank">${rank}</span>
       <img class="avatar" src="${assetFor(id)}" alt="${NAMES[id]}">
       <div class="player-main">
-        <div class="player-name" style="color:${COLORS[id]}">${NAMES[id]}</div>
+        <div class="player-name" style="color:${colorFor(id)}">${NAMES[id]}</div>
         <div class="player-note">${note}</div>
       </div>
     `;
@@ -824,7 +924,7 @@ function showEndModal() {
       <span class="rank">#${index + 1}</span>
       <img class="avatar" src="${assetFor(id)}" alt="${NAMES[id]}">
       <div class="player-main">
-        <div class="player-name" style="color:${COLORS[id]}">${NAMES[id]}</div>
+        <div class="player-name" style="color:${colorFor(id)}">${NAMES[id]}</div>
         <div class="player-note">${game.players[id].position} 格</div>
       </div>
     `;
@@ -840,7 +940,8 @@ function closeEndModal() {
 
 function runSimulation() {
   const count = clamp(Number(document.querySelector("#simCount").value) || 5000, 100, 100000);
-  const wins = Object.fromEntries(PLAYER_IDS.map((id) => [id, 0]));
+  const playerIds = activePlayerIds();
+  const wins = Object.fromEntries(playerIds.map((id) => [id, 0]));
   for (let i = 0; i < count; i++) {
     const sim = createGame();
     while (!sim.finished) stepGame(sim, false);
@@ -848,7 +949,7 @@ function runSimulation() {
   }
 
   simResultsEl.innerHTML = "";
-  PLAYER_IDS
+  playerIds
     .map((id) => ({ id, rate: wins[id] / count }))
     .sort((a, b) => b.rate - a.rate)
     .forEach(({ id, rate }, index) => {
@@ -858,7 +959,7 @@ function runSimulation() {
         <span class="rank">#${index + 1}</span>
         <img class="avatar" src="${assetFor(id)}" alt="${NAMES[id]}">
         <div class="player-name">${NAMES[id]}　<strong>${(rate * 100).toFixed(2)}%</strong></div>
-        <div class="bar"><div class="bar-fill" style="width:${rate * 100}%;background:${COLORS[id]}"></div></div>
+        <div class="bar"><div class="bar-fill" style="width:${rate * 100}%;background:${colorFor(id)}"></div></div>
       `;
       simResultsEl.appendChild(row);
     });
@@ -913,6 +1014,15 @@ function updateStageScale() {
   stageEl.style.setProperty("--stage-scale", getStagePieceScale());
 }
 
+function updateGroupControls() {
+  if (customGroupButton) {
+    const isCustom = activeGroupId === CUSTOM_GROUP_ID;
+    customGroupButton.classList.toggle("active", isCustom);
+    customGroupButton.setAttribute("aria-pressed", String(isCustom));
+  }
+  if (groupSelectEl && GROUPS[activeGroupId]) groupSelectEl.value = activeGroupId;
+}
+
 function getStackSpread(stackIndex, id) {
   if (id === "boss") return { dx: 0, dy: 16, lift: 0 };
   const level = Math.max(0, stackIndex);
@@ -947,14 +1057,6 @@ function getCellClass(index) {
   if (ADVANCE_CELLS.has(index)) return "advance";
   if (BLOCK_CELLS.has(index)) return "block";
   if (TIME_CELLS.has(index)) return "time";
-  return "";
-}
-
-function getCellType(index) {
-  if (ADVANCE_CELLS.has(index)) return "+";
-  if (BLOCK_CELLS.has(index)) return "-";
-  if (TIME_CELLS.has(index)) return "時";
-  if (index === FINISH) return "終";
   return "";
 }
 
