@@ -82,6 +82,56 @@ test("custom group can select six racers from both groups", () => {
   assert.match(script, /racerSlot/);
 });
 
+test("custom group can assign starting positions from the allowed late-race cells", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(script, /CUSTOM_START_POSITIONS = \[29, 30, 31, 32, 1\]/);
+  assert.match(script, /CUSTOM_START_STORAGE_KEY/);
+  assert.match(script, /loadCustomStartPositions/);
+  assert.match(script, /getCustomPickerStartPositions/);
+  assert.match(script, /stacks\[startPosition\]\.push\(id\)/);
+  assert.match(script, /class="custom-start-select"/);
+  assert.match(styles, /\.custom-start-control/);
+});
+
+test("custom racers starting near the finish must complete a full lap before finishing", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /CUSTOM_FULL_LAP_START_POSITIONS = \[29, 30, 31, 32\]/);
+  assert.match(script, /needsFullLap/);
+  assert.match(script, /finishArmed/);
+  assert.match(script, /resolveForwardMove/);
+  assert.match(script, /armFullLapFinish/);
+  assert.match(script, /canRecordFinish/);
+  assert.match(script, /rawTo >= FINISH/);
+  assert.match(script, /player\.position >= FINISH && canRecordFinish\(state, id\)/);
+  assert.match(script, /buildPath\(event\.from, event\.to, event\.wrapped\)/);
+  assert.match(script, /if \(wrapped\)/);
+});
+
+test("win-rate simulation reports average rank and top-four rate", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(script, /rankTotals/);
+  assert.match(script, /topFour/);
+  assert.match(script, /avgRank/);
+  assert.match(script, /topFourRate/);
+  assert.match(script, /平均排名/);
+  assert.match(script, /前四/);
+  assert.match(styles, /\.sim-stats/);
+});
+
+test("B snow teleports onto the nearest racer ahead and lands on top", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /position > actor\.position/);
+  assert.match(script, /\.sort\(\(a, b\) => a - b\)\[0\]/);
+  assert.match(script, /teleportCarriedGroup\(state, movedIds, targetPosition, leader\)/);
+  assert.match(script, /topId \? \[\.\.\.movedIds\.filter\(\(id\) => id !== topId\), topId\] : movedIds/);
+});
+
 test("map removes transient text overlays and first-place spotlight", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");

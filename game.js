@@ -7,8 +7,11 @@ const TIME_CELLS = TRACK_CONFIG.timeCells;
 const PLAYER_IDS = ["lu", "west", "daphne", "snow", "kat", "fei"];
 const CUSTOM_GROUP_ID = "custom";
 const CUSTOM_SELECTION_SIZE = 6;
+const CUSTOM_START_POSITIONS = [29, 30, 31, 32, 1];
+const CUSTOM_FULL_LAP_START_POSITIONS = [29, 30, 31, 32];
 const GROUP_STORAGE_KEY = "dango-race-group";
 const CUSTOM_GROUP_STORAGE_KEY = "dango-race-custom-selection";
+const CUSTOM_START_STORAGE_KEY = "dango-race-custom-start-positions";
 const DEFAULT_GROUP_ID = "b";
 const PIECE_REFERENCE_STAGE_WIDTH = 1040;
 const MIN_PIECE_STAGE_SCALE = 0.34;
@@ -269,6 +272,24 @@ function loadCustomSelection() {
   }
 }
 
+function loadCustomStartPositions() {
+  try {
+    const parsed = JSON.parse(window.localStorage?.getItem(CUSTOM_START_STORAGE_KEY) || "{}");
+    const valid = getCustomRacerOptions().map((option) => option.id);
+    return Object.fromEntries(
+      Object.entries(parsed || {})
+        .filter(([id, position]) => valid.includes(id) && CUSTOM_START_POSITIONS.includes(Number(position)))
+        .map(([id, position]) => [id, Number(position)])
+    );
+  } catch {
+    return {};
+  }
+}
+
+function getCustomStartPosition(id, starts = loadCustomStartPositions()) {
+  return CUSTOM_START_POSITIONS.includes(starts[id]) ? starts[id] : 1;
+}
+
 function colorFor(id) {
   return COLORS[racerSlot(id)] || COLORS.boss;
 }
@@ -277,17 +298,28 @@ function setupCustomPicker() {
   if (!customModalEl || !customGridEl) return;
   customGridEl.innerHTML = "";
   const selected = new Set(loadCustomSelection());
+  const starts = loadCustomStartPositions();
   for (const option of getCustomRacerOptions()) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "custom-racer";
-    button.dataset.id = option.id;
-    button.innerHTML = `
+    const card = document.createElement("div");
+    card.className = "custom-racer";
+    card.dataset.id = option.id;
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
+    card.innerHTML = `
       <span class="custom-racer-group">${option.groupId.toUpperCase()}</span>
       <img src="${option.asset}" alt="${option.name}">
-      <span>${option.name}</span>
+      <span class="custom-racer-name">${option.name}</span>
+      <label class="custom-start-control">
+        <span>站位</span>
+        <select class="custom-start-select" data-start-position aria-label="${option.name} 初始站位">
+          ${CUSTOM_START_POSITIONS.map((position) => `<option value="${position}">${position}</option>`).join("")}
+        </select>
+      </label>
     `;
-    button.addEventListener("click", () => {
+    card.querySelector(".custom-start-select").value = getCustomStartPosition(option.id, starts);
+    card.querySelector(".custom-start-select").addEventListener("click", (event) => event.stopPropagation());
+    card.querySelector(".custom-start-select").addEventListener("change", (event) => event.stopPropagation());
+    const toggle = () => {
       const current = getCustomPickerSelection();
       if (current.has(option.id)) {
         current.delete(option.id);
@@ -295,8 +327,14 @@ function setupCustomPicker() {
         current.add(option.id);
       }
       renderCustomPickerSelection(current);
+    };
+    card.addEventListener("click", toggle);
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggle();
     });
-    customGridEl.appendChild(button);
+    customGridEl.appendChild(card);
   }
   customSaveButton?.addEventListener("click", saveCustomSelection);
   customCancelButton?.addEventListener("click", closeCustomPicker);
@@ -318,14 +356,31 @@ function closeCustomPicker() {
 
 function getCustomPickerSelection() {
   const selected = new Set();
-  customGridEl?.querySelectorAll(".custom-racer.selected").forEach((button) => selected.add(button.dataset.id));
+  customGridEl?.querySelectorAll(".custom-racer.selected").forEach((card) => selected.add(card.dataset.id));
   return selected;
 }
 
+function getCustomPickerStartPositions(selectedIds) {
+  const selected = new Set(selectedIds);
+  const starts = {};
+  customGridEl?.querySelectorAll(".custom-racer").forEach((card) => {
+    if (!selected.has(card.dataset.id)) return;
+    const position = Number(card.querySelector(".custom-start-select")?.value);
+    starts[card.dataset.id] = CUSTOM_START_POSITIONS.includes(position) ? position : 1;
+  });
+  return starts;
+}
+
 function renderCustomPickerSelection(selected) {
-  customGridEl?.querySelectorAll(".custom-racer").forEach((button) => {
-    button.classList.toggle("selected", selected.has(button.dataset.id));
-    button.disabled = !selected.has(button.dataset.id) && selected.size >= CUSTOM_SELECTION_SIZE;
+  customGridEl?.querySelectorAll(".custom-racer").forEach((card) => {
+    const isSelected = selected.has(card.dataset.id);
+    const isLocked = !isSelected && selected.size >= CUSTOM_SELECTION_SIZE;
+    card.classList.toggle("selected", isSelected);
+    card.classList.toggle("disabled", isLocked);
+    card.setAttribute("aria-pressed", String(isSelected));
+    card.setAttribute("aria-disabled", String(isLocked));
+    const startSelect = card.querySelector(".custom-start-select");
+    if (startSelect) startSelect.disabled = !isSelected;
   });
   if (customCountEl) customCountEl.textContent = `${selected.size}/${CUSTOM_SELECTION_SIZE}`;
   if (customSaveButton) customSaveButton.disabled = selected.size !== CUSTOM_SELECTION_SIZE;
@@ -335,6 +390,7 @@ function saveCustomSelection() {
   const selected = [...getCustomPickerSelection()];
   if (selected.length !== CUSTOM_SELECTION_SIZE) return;
   window.localStorage?.setItem(CUSTOM_GROUP_STORAGE_KEY, JSON.stringify(selected));
+  window.localStorage?.setItem(CUSTOM_START_STORAGE_KEY, JSON.stringify(getCustomPickerStartPositions(selected)));
   activeGroupId = CUSTOM_GROUP_ID;
   window.localStorage?.setItem(GROUP_STORAGE_KEY, activeGroupId);
   stopAuto();
@@ -349,13 +405,18 @@ function saveCustomSelection() {
 
 function createGame() {
   const playerIds = activePlayerIds();
+  const customStartPositions = activeGroupId === CUSTOM_GROUP_ID ? loadCustomStartPositions() : {};
   const stacks = Array.from({ length: TRACK_LENGTH + 1 }, () => []);
   const players = {};
   for (const id of playerIds) {
+    const startPosition = activeGroupId === CUSTOM_GROUP_ID ? getCustomStartPosition(id, customStartPositions) : 1;
+    const needsFullLap = activeGroupId === CUSTOM_GROUP_ID && CUSTOM_FULL_LAP_START_POSITIONS.includes(startPosition);
     players[id] = {
       id,
-      position: 1,
+      position: startPosition,
       finished: false,
+      needsFullLap,
+      finishArmed: !needsFullLap,
       lastRoll: null,
       metBoss: false,
       katUsed: false,
@@ -364,7 +425,10 @@ function createGame() {
     };
   }
   const firstQueue = shuffle(playerIds);
-  stacks[1].push(...[...firstQueue].reverse());
+  for (const id of [...firstQueue].reverse()) {
+    const startPosition = players[id].position;
+    stacks[startPosition].push(id);
+  }
   players.boss = {
     id: "boss",
     position: FINISH,
@@ -553,6 +617,7 @@ function takeTurn(state, id, withLog) {
     via: beforeLanding,
     to: finalTo,
     carried: moved.carried,
+    wrapped: moved.wrapped,
     reasons: [...reasons],
   };
   addLog(
@@ -608,14 +673,15 @@ function applyGroupBAfterMoveRules(state, movedIds, from, reasons) {
     .sort((a, b) => a - b)[0];
   if (!targetPosition) return;
   actor.electronicGhostUsed = true;
-  teleportCarriedGroup(state, movedIds, targetPosition);
+  teleportCarriedGroup(state, movedIds, targetPosition, leader);
   reasons.push(`${SKILL_NAMES[leader]}：傳送到最近團子頂端`);
 }
 
-function teleportCarriedGroup(state, movedIds, to) {
+function teleportCarriedGroup(state, movedIds, to, topId = null) {
   const from = state.players[movedIds[0]].position;
+  const landingOrder = topId ? [...movedIds.filter((id) => id !== topId), topId] : movedIds;
   removeIdsFromStack(state.stacks[from], movedIds);
-  state.stacks[to].push(...movedIds);
+  state.stacks[to].push(...landingOrder);
   for (const id of movedIds) state.players[id].position = to;
 }
 
@@ -632,19 +698,21 @@ function moveStackFrom(state, id, delta) {
   const index = stack.indexOf(id);
   if (index < 0) {
     const carried = [id];
-    const to = clamp(from + delta, 1, FINISH);
+    const move = resolveForwardMove(state, id, from, delta, carried);
+    const to = move.to;
     stackLanding(state, to, carried, id);
     actor.position = to;
     checkBossMeeting(state, carried, to);
-    return { from, to, carried };
+    return { from, to, carried, wrapped: move.wrapped };
   }
   const carried = stack.splice(index);
-  const to = clamp(from + delta, 1, FINISH);
+  const move = resolveForwardMove(state, id, from, delta, carried);
+  const to = move.to;
 
   stackLanding(state, to, carried, id);
   for (const pid of carried) state.players[pid].position = to;
   checkBossMeeting(state, carried, to);
-  return { from, to, carried };
+  return { from, to, carried, wrapped: move.wrapped };
 }
 
 function stackLanding(state, to, carried, leader) {
@@ -653,6 +721,31 @@ function stackLanding(state, to, carried, leader) {
   } else {
     state.stacks[to].push(...carried);
   }
+}
+
+function resolveForwardMove(state, leader, from, delta, movedIds = [leader]) {
+  if (delta <= 0) return { to: clamp(from + delta, 1, FINISH), wrapped: false };
+  const actor = state.players[leader];
+  if (actor?.needsFullLap && !actor.finishArmed) {
+    const rawTo = from + delta;
+    if (from === FINISH || rawTo >= FINISH) {
+      armFullLapFinish(state, movedIds);
+      return { to: ((rawTo - FINISH) % FINISH) + 1, wrapped: true };
+    }
+    return { to: rawTo, wrapped: false };
+  }
+  return { to: clamp(from + delta, 1, FINISH), wrapped: false };
+}
+
+function armFullLapFinish(state, ids) {
+  for (const id of ids) {
+    if (state.players[id]?.needsFullLap) state.players[id].finishArmed = true;
+  }
+}
+
+function canRecordFinish(state, id) {
+  const player = state.players[id];
+  return !player?.needsFullLap || player.finishArmed;
 }
 
 function applyLandingRules(state, movedIds, withLog, reasons) {
@@ -689,7 +782,8 @@ function moveWholeCarriedGroup(state, movedIds, delta) {
   const indexes = movedIds.map((id) => stack.indexOf(id)).filter((index) => index >= 0);
   const first = Math.min(...indexes);
   const group = stack.splice(first, movedIds.length);
-  const to = clamp(from + delta, 1, FINISH);
+  const move = resolveForwardMove(state, movedIds[0], from, delta, group);
+  const to = move.to;
   state.stacks[to].push(...group);
   for (const id of group) state.players[id].position = to;
 }
@@ -763,7 +857,10 @@ function checkBossMeeting(state, ids, position) {
 }
 
 function recordFinishers(state, withLog) {
-  const finishers = state.playerIds.filter((id) => !state.players[id].finished && state.players[id].position >= FINISH);
+  const finishers = state.playerIds.filter((id) => {
+    const player = state.players[id];
+    return !player.finished && player.position >= FINISH && canRecordFinish(state, id);
+  });
   if (!finishers.length) return [];
   finishers.sort((a, b) => state.stacks[FINISH].indexOf(b) - state.stacks[FINISH].indexOf(a));
   for (const id of finishers) {
@@ -809,7 +906,7 @@ async function animateTurn(event) {
   });
   hidePieces(event.carried, true);
 
-  const path = buildPath(event.from, event.to);
+  const path = buildPath(event.from, event.to, event.wrapped);
   for (let i = 0; i < path.length; i++) {
     const point = cellPoint(path[i]);
     moving.forEach((img, index) => {
@@ -826,8 +923,14 @@ async function animateTurn(event) {
   diceEl.classList.remove("roll");
 }
 
-function buildPath(from, to) {
+function buildPath(from, to, wrapped = false) {
   if (from === to) return [to];
+  if (wrapped) {
+    const path = [];
+    for (let p = from + 1; p <= FINISH; p++) path.push(p);
+    for (let p = 1; p <= to; p++) path.push(p);
+    return path;
+  }
   const dir = to > from ? 1 : -1;
   const path = [];
   for (let p = from + dir; dir > 0 ? p <= to : p >= to; p += dir) {
@@ -942,24 +1045,42 @@ function runSimulation() {
   const count = clamp(Number(document.querySelector("#simCount").value) || 5000, 100, 100000);
   const playerIds = activePlayerIds();
   const wins = Object.fromEntries(playerIds.map((id) => [id, 0]));
+  const rankTotals = Object.fromEntries(playerIds.map((id) => [id, 0]));
+  const topFour = Object.fromEntries(playerIds.map((id) => [id, 0]));
   for (let i = 0; i < count; i++) {
     const sim = createGame();
     while (!sim.finished) stepGame(sim, false);
     wins[sim.rankings[0]] += 1;
+    sim.rankings.forEach((id, index) => {
+      const rank = index + 1;
+      rankTotals[id] += rank;
+      if (rank <= 4) topFour[id] += 1;
+    });
   }
 
   simResultsEl.innerHTML = "";
   playerIds
-    .map((id) => ({ id, rate: wins[id] / count }))
+    .map((id) => ({
+      id,
+      rate: wins[id] / count,
+      avgRank: rankTotals[id] / count,
+      topFourRate: topFour[id] / count,
+    }))
     .sort((a, b) => b.rate - a.rate)
-    .forEach(({ id, rate }, index) => {
+    .forEach(({ id, rate, avgRank, topFourRate }, index) => {
       const row = document.createElement("div");
       row.className = "result-row";
       row.innerHTML = `
         <span class="rank">#${index + 1}</span>
         <img class="avatar" src="${assetFor(id)}" alt="${NAMES[id]}">
+        <div class="sim-result-main">
         <div class="player-name">${NAMES[id]}　<strong>${(rate * 100).toFixed(2)}%</strong></div>
         <div class="bar"><div class="bar-fill" style="width:${rate * 100}%;background:${colorFor(id)}"></div></div>
+        <div class="sim-stats">
+          <span>平均排名 ${avgRank.toFixed(2)}</span>
+          <span>前四 ${(topFourRate * 100).toFixed(2)}%</span>
+        </div>
+        </div>
       `;
       simResultsEl.appendChild(row);
     });

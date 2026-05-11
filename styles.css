@@ -439,6 +439,21 @@ h2 {
   min-width: 0;
 }
 
+.sim-result-main {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.sim-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
 .avatar {
   width: 58px;
   height: 42px;
@@ -560,6 +575,7 @@ h2 {
   background: #f8fbfc;
   color: var(--ink);
   box-shadow: none;
+  cursor: pointer;
 }
 
 .custom-racer img {
@@ -568,10 +584,32 @@ h2 {
   object-fit: contain;
 }
 
-.custom-racer span:last-child {
+.custom-racer-name {
   font-size: 0.92rem;
   font-weight: 950;
   text-align: center;
+}
+
+.custom-start-control {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-align: left;
+}
+
+.custom-start-select {
+  min-height: 34px;
+  width: 100%;
+  border: 1px solid rgba(42, 111, 166, 0.26);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #dff4ff);
+  color: #25465c;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 950;
 }
 
 .custom-racer-group {
@@ -595,8 +633,13 @@ h2 {
   box-shadow: 0 10px 22px rgba(54, 170, 179, 0.18);
 }
 
-.custom-racer:disabled {
+.custom-racer:disabled,
+.custom-racer.disabled {
   opacity: 0.45;
+}
+
+.custom-racer.disabled {
+  cursor: not-allowed;
 }
 
 .custom-actions button {
