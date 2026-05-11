@@ -395,8 +395,6 @@ h2 {
   width: var(--size);
   height: var(--height);
   object-fit: contain;
-  border-radius: 6px;
-  box-shadow: 0 12px 16px rgba(31, 43, 60, 0.16);
   transform: translate(calc(-50% + var(--dx, 0px)), calc(-88% - var(--lift) + var(--dy, 0px))) scale(var(--scale));
   transform-origin: 50% 90%;
   z-index: var(--z);

@@ -63,6 +63,14 @@ test("custom map keeps coordinate overlays aligned on mobile", () => {
   assert.doesNotMatch(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.stage\.custom-map\s*\{[\s\S]*height:\s*100%/);
 });
 
+test("transparent racer pieces avoid rectangular image shadows", () => {
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+  const pieceRule = styles.match(/\.piece,\s*\.moving-piece\s*\{[\s\S]*?\n\}/)?.[0] || "";
+
+  assert.doesNotMatch(pieceRule, /box-shadow/);
+  assert.match(styles, /\.piece,\s*\.moving-piece,[\s\S]*filter:[\s\S]*drop-shadow/);
+});
+
 test("custom group can select six racers from both groups", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
