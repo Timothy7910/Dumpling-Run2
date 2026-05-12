@@ -806,7 +806,7 @@ function applyGroupCRoundStartRules(state, withLog) {
   for (const id of state.playerIds) {
     if (!isGroupC(id) || state.players[id].finished) continue;
     const slot = racerSlot(id);
-    if (slot === "lu" && isStackTop(state, id) && hasStackBelow(state, id)) {
+    if (slot === "lu" && isStackTop(state, id) && hasNonBossStackBelow(state, id)) {
       state.players[id].skipThisRound = true;
       state.players[id].actLastNextRound = true;
       addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本回合不行動，下回合最後行動。`, withLog);
@@ -853,8 +853,8 @@ function applyGroupCRoundEndRules(state, withLog) {
   const actor = state.players[katId];
   if (actor.finished) return;
   if (hasStackAbove(state, katId) && Math.random() < 0.4) {
-    moveToHighestStackTop(state, katId);
-    addLog(state, `回合結束，${NAMES[katId]} 發動「${SKILL_NAMES[katId]}」，移動到最高堆疊頂端。`, withLog);
+    moveToCurrentStackTop(state, katId);
+    addLog(state, `回合結束，${NAMES[katId]} 發動「${SKILL_NAMES[katId]}」，移動到當前堆疊最上方。`, withLog);
   }
 }
 
@@ -896,6 +896,22 @@ function isStackBottom(state, id) {
 function hasStackBelow(state, id) {
   const stack = state.stacks[state.players[id].position] || [];
   return stack.indexOf(id) > 0;
+}
+
+function hasNonBossStackBelow(state, id) {
+  const stack = state.stacks[state.players[id].position] || [];
+  const index = stack.indexOf(id);
+  if (index <= 0) return false;
+  return stack.slice(0, index).some((pid) => pid !== "boss");
+}
+
+function moveToCurrentStackTop(state, id) {
+  const pos = state.players[id].position;
+  const stack = state.stacks[pos];
+  const index = stack.indexOf(id);
+  if (index < 0 || index === stack.length - 1) return;
+  stack.splice(index, 1);
+  stack.push(id);
 }
 
 function hasStackAbove(state, id) {

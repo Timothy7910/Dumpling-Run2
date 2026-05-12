@@ -9,3 +9,11 @@ dist/
 build/
 .DS_Store
 Thumbs.db
+ffmpeg-bin/
+ffmpeg-ess/
+ffmpeg.zip
+ffmpeg2.zip
+ffmpeg-essentials.zip
+public/src-video.mp4
+public/src-image.png
+public/overlay-*.html
