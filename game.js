@@ -552,6 +552,7 @@ function stepGame(state, withLog = false) {
     const event = skipTurn(state, id, withLog);
     event.newRanks = recordFinishers(state, withLog);
     if (!state.finished && state.queue.length === 0) {
+      applyGroupCRoundEndRules(state, withLog);
       applyBossRoundEndRule(state, withLog);
       state.round += 1;
     }
@@ -561,6 +562,7 @@ function stepGame(state, withLog = false) {
   const event = takeTurn(state, id, withLog);
   event.newRanks = recordFinishers(state, withLog);
   if (!state.finished && state.queue.length === 0) {
+    applyGroupCRoundEndRules(state, withLog);
     applyBossRoundEndRule(state, withLog);
     state.round += 1;
   }
@@ -843,9 +845,16 @@ function applyGroupCAfterMoveRules(state, movedIds, from, reasons) {
   if (slot === "west") {
     applyYounuoAnchor(state, leader, reasons);
   }
-  if (slot === "kat" && hasStackAbove(state, leader) && Math.random() < 0.4) {
-    moveToHighestStackTop(state, leader);
-    reasons.push(`${SKILL_NAMES[leader]}：移動到最高堆疊頂端`);
+}
+
+function applyGroupCRoundEndRules(state, withLog) {
+  const katId = state.playerIds.find((id) => isGroupC(id) && racerSlot(id) === "kat");
+  if (!katId) return;
+  const actor = state.players[katId];
+  if (actor.finished) return;
+  if (hasStackAbove(state, katId) && Math.random() < 0.4) {
+    moveToHighestStackTop(state, katId);
+    addLog(state, `回合結束，${NAMES[katId]} 發動「${SKILL_NAMES[katId]}」，移動到最高堆疊頂端。`, withLog);
   }
 }
 
@@ -1014,12 +1023,12 @@ function applyLandingRules(state, movedIds, withLog, reasons) {
   if (actor.position >= FINISH) return;
 
   if (ADVANCE_CELLS.has(actor.position)) {
-    const isALu = !isGroupB(leader) && racerSlot(leader) === "lu";
+    const isALu = isGroupA(leader) && racerSlot(leader) === "lu";
     const bonus = isALu ? 3 : 1;
     reasons.push(isALu ? `${SKILL_NAMES[leader]}：推進裝置 +${bonus}` : `推進裝置 +${bonus}`);
     moveWholeCarriedGroup(state, movedIds, bonus);
   } else if (BLOCK_CELLS.has(actor.position)) {
-    const isALu = !isGroupB(leader) && racerSlot(leader) === "lu";
+    const isALu = isGroupA(leader) && racerSlot(leader) === "lu";
     const penalty = isALu ? -2 : -1;
     reasons.push(isALu ? `${SKILL_NAMES[leader]}：阻退裝置 ${penalty}` : `阻退裝置 ${penalty}`);
     moveWholeCarriedGroup(state, movedIds, penalty);
