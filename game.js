@@ -552,7 +552,6 @@ function stepGame(state, withLog = false) {
     const event = skipTurn(state, id, withLog);
     event.newRanks = recordFinishers(state, withLog);
     if (!state.finished && state.queue.length === 0) {
-      applyGroupCRoundEndRules(state, withLog);
       applyBossRoundEndRule(state, withLog);
       state.round += 1;
     }
@@ -562,7 +561,6 @@ function stepGame(state, withLog = false) {
   const event = takeTurn(state, id, withLog);
   event.newRanks = recordFinishers(state, withLog);
   if (!state.finished && state.queue.length === 0) {
-    applyGroupCRoundEndRules(state, withLog);
     applyBossRoundEndRule(state, withLog);
     state.round += 1;
   }
@@ -709,6 +707,7 @@ function takeTurn(state, id, withLog) {
   applyLandingRules(state, moved.carried, withLog, reasons);
   applyGroupBAfterMoveRules(state, moved.carried, moved.from, reasons);
   applyGroupCAfterMoveRules(state, moved.carried, moved.from, reasons);
+  applyJinxiLandingTrigger(state, id, moved.to, withLog, reasons);
   actor.hasMoved = true;
   if (!isGroupB(id) && racerSlot(id) === "kat" && !actor.katUsed && actor.position < FINISH && isLastPlace(state, id)) {
     actor.katUsed = true;
@@ -847,14 +846,19 @@ function applyGroupCAfterMoveRules(state, movedIds, from, reasons) {
   }
 }
 
-function applyGroupCRoundEndRules(state, withLog) {
+function applyJinxiLandingTrigger(state, landingId, landingPos, withLog, reasons) {
+  if (landingId === "boss") return;
   const katId = state.playerIds.find((id) => isGroupC(id) && racerSlot(id) === "kat");
   if (!katId) return;
-  const actor = state.players[katId];
-  if (actor.finished) return;
-  if (hasNonBossStackAbove(state, katId) && Math.random() < 0.4) {
+  const katActor = state.players[katId];
+  if (katActor.finished || katActor.position !== landingPos) return;
+  const stack = state.stacks[landingPos] || [];
+  const katIndex = stack.indexOf(katId);
+  const landerIndex = stack.indexOf(landingId);
+  if (katIndex < 0 || landerIndex < 0 || landerIndex <= katIndex) return;
+  if (Math.random() < 0.4) {
     moveToCurrentStackTop(state, katId);
-    addLog(state, `回合結束，${NAMES[katId]} 發動「${SKILL_NAMES[katId]}」，移動到當前堆疊最上方。`, withLog);
+    reasons.push(`${NAMES[katId]} 發動「${SKILL_NAMES[katId]}」，移動到當前堆疊最上方`);
   }
 }
 
