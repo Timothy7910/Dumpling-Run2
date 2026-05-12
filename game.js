@@ -5,14 +5,17 @@ const ADVANCE_CELLS = TRACK_CONFIG.advanceCells;
 const BLOCK_CELLS = TRACK_CONFIG.blockCells;
 const TIME_CELLS = TRACK_CONFIG.timeCells;
 const PLAYER_IDS = ["lu", "west", "daphne", "snow", "kat", "fei"];
+const CUSTOM_SOURCE_GROUP_IDS = ["a", "b", "c"];
 const CUSTOM_GROUP_ID = "custom";
 const CUSTOM_SELECTION_SIZE = 6;
 const CUSTOM_START_POSITIONS = [29, 30, 31, 32, 1];
 const CUSTOM_FULL_LAP_START_POSITIONS = [29, 30, 31, 32];
 const GROUP_STORAGE_KEY = "dango-race-group";
+const GROUP_DEFAULT_VERSION_STORAGE_KEY = "dango-race-group-default-version";
+const GROUP_DEFAULT_VERSION = "c-group-default";
 const CUSTOM_GROUP_STORAGE_KEY = "dango-race-custom-selection";
 const CUSTOM_START_STORAGE_KEY = "dango-race-custom-start-positions";
-const DEFAULT_GROUP_ID = "b";
+const DEFAULT_GROUP_ID = "c";
 const PIECE_REFERENCE_STAGE_WIDTH = 1040;
 const MIN_PIECE_STAGE_SCALE = 0.34;
 
@@ -119,6 +122,52 @@ const GROUPS = {
       },
     },
   },
+  c: {
+    label: "C組",
+    players: {
+      lu: {
+        name: "奧古斯塔團子",
+        skillName: "總督權柄",
+        note: "回合開始時若在堆疊最頂端，本回合不行動，且下回合最後行動",
+        asset: "public/dangos/augusta-raw.png",
+      },
+      west: {
+        name: "尤諾團子",
+        skillName: "錨定命途",
+        note: "每場一次，過中點後若前後有非布大王團子，會把它們傳送到自己格",
+        asset: "public/dangos/younuo-raw.png",
+      },
+      daphne: {
+        name: "弗洛洛團子",
+        skillName: "優雅陰謀",
+        note: "回合開始時若在堆疊最底層，本回合移動額外 +3",
+        asset: "public/dangos/fuluoluo-raw.png",
+      },
+      snow: {
+        name: "長離團子",
+        skillName: "謀而後定",
+        note: "若下方堆疊其他團子，下回合 65% 機率最後行動",
+        asset: "public/dangos/changli-raw.png",
+      },
+      kat: {
+        name: "今汐團子",
+        skillName: "今尹之名",
+        note: "若頭頂堆疊其他團子，40% 機率移動到所有團子的最上方",
+        asset: "public/dangos/jinxi-raw.png",
+      },
+      fei: {
+        name: "卡卡羅團子",
+        skillName: "如影隨形",
+        note: "開始移動時若在最後一名，額外前進 3 格",
+        asset: "public/dangos/kakaluo-raw.png",
+      },
+      boss: {
+        name: "布大王",
+        note: "第 3 回合從終點出發",
+        asset: "public/dangos/boss-raw.png",
+      },
+    },
+  },
 };
 
 let activeGroupId = loadActiveGroupId();
@@ -212,6 +261,11 @@ function setupGroupSelect() {
 }
 
 function loadActiveGroupId() {
+  if (window.localStorage?.getItem(GROUP_DEFAULT_VERSION_STORAGE_KEY) !== GROUP_DEFAULT_VERSION) {
+    window.localStorage?.setItem(GROUP_DEFAULT_VERSION_STORAGE_KEY, GROUP_DEFAULT_VERSION);
+    window.localStorage?.setItem(GROUP_STORAGE_KEY, DEFAULT_GROUP_ID);
+    return DEFAULT_GROUP_ID;
+  }
   const saved = window.localStorage?.getItem(GROUP_STORAGE_KEY);
   return normalizeGroupId(saved || DEFAULT_GROUP_ID);
 }
@@ -244,13 +298,21 @@ function isGroupB(id) {
   return racerSourceGroup(id) === "b";
 }
 
+function isGroupA(id) {
+  return racerSourceGroup(id) === "a";
+}
+
+function isGroupC(id) {
+  return racerSourceGroup(id) === "c";
+}
+
 function activePlayerIds() {
   if (activeGroupId !== CUSTOM_GROUP_ID) return [...PLAYER_IDS];
   return loadCustomSelection();
 }
 
 function getCustomRacerOptions() {
-  return ["a", "b"].flatMap((groupId) =>
+  return CUSTOM_SOURCE_GROUP_IDS.flatMap((groupId) =>
     PLAYER_IDS.map((slot) => ({
       id: `${groupId}:${slot}`,
       groupId,
@@ -261,7 +323,7 @@ function getCustomRacerOptions() {
 }
 
 function loadCustomSelection() {
-  const fallback = getCustomRacerOptions().slice(6, 12).map((option) => option.id);
+  const fallback = getCustomRacerOptions().filter((option) => option.groupId === DEFAULT_GROUP_ID).map((option) => option.id);
   try {
     const parsed = JSON.parse(window.localStorage?.getItem(CUSTOM_GROUP_STORAGE_KEY) || "[]");
     const valid = getCustomRacerOptions().map((option) => option.id);
@@ -422,6 +484,12 @@ function createGame() {
       katUsed: false,
       westMarked: false,
       hasMoved: false,
+      skipThisRound: false,
+      actLastThisRound: false,
+      actLastNextRound: false,
+      bottomBonusThisRound: false,
+      changliLastChanceNextRound: false,
+      anchorUsed: false,
     };
   }
   const firstQueue = shuffle(playerIds);
@@ -451,6 +519,7 @@ function createGame() {
     lastEvent: null,
     plannedRolls: {},
   };
+  applyGroupCRoundStartRules(state, false);
   prepareRoundRolls(state);
   return state;
 }
@@ -479,6 +548,16 @@ function stepGame(state, withLog = false) {
   const actor = state.players[id];
   if (!actor || actor.finished) return stepGame(state, withLog);
   state.current = id;
+  if (actor.skipThisRound) {
+    const event = skipTurn(state, id, withLog);
+    event.newRanks = recordFinishers(state, withLog);
+    if (!state.finished && state.queue.length === 0) {
+      applyBossRoundEndRule(state, withLog);
+      state.round += 1;
+    }
+    state.lastEvent = event;
+    return event;
+  }
   const event = takeTurn(state, id, withLog);
   event.newRanks = recordFinishers(state, withLog);
   if (!state.finished && state.queue.length === 0) {
@@ -497,17 +576,20 @@ function beginRound(state, withLog) {
   }
 
   for (const id of state.playerIds) state.players[id].westMarked = false;
+  applyGroupCRoundStartRules(state, withLog);
   markWestTargets(state, withLog);
 
   const active = state.playerIds.filter((id) => !state.players[id].finished);
   if (state.players.boss.active) active.push("boss");
   state.queue = shuffle(active);
+  const lastIds = state.playerIds.filter((id) => state.players[id].actLastThisRound);
+  moveQueueIdsToEnd(state.queue, lastIds);
   prepareRoundRolls(state);
   addLog(state, `第 ${state.round} 回合順序：${state.queue.map((id) => NAMES[id]).join("、")}。`, withLog);
 }
 
 function markWestTargets(state, withLog) {
-  const westId = state.playerIds.find((id) => racerSlot(id) === "west" && !isGroupB(id));
+  const westId = state.playerIds.find((id) => racerSlot(id) === "west" && isGroupA(id));
   if (!westId) return;
   const west = state.players[westId];
   if (west.finished || state.round === 1) return;
@@ -540,7 +622,7 @@ function compareStanding(state, a, b) {
 function prepareRoundRolls(state) {
   state.plannedRolls = {};
   for (const id of state.queue) {
-    if (id !== "boss") state.plannedRolls[id] = rollDirectForPlayer(state, id);
+    if (id !== "boss" && !state.players[id]?.skipThisRound) state.plannedRolls[id] = rollDirectForPlayer(state, id);
   }
 }
 
@@ -565,6 +647,24 @@ function rollDirectForPlayer(state, id) {
   return rollDie();
 }
 
+function skipTurn(state, id, withLog) {
+  const actor = state.players[id];
+  actor.skipThisRound = false;
+  actor.hasMoved = true;
+  const reasons = [`${SKILL_NAMES[id]}：本回合不行動`];
+  addLog(state, `${NAMES[id]} 因 ${SKILL_NAMES[id]} 暫停行動。`, withLog);
+  return {
+    id,
+    roll: "-",
+    from: actor.position,
+    via: actor.position,
+    to: actor.position,
+    carried: [id],
+    wrapped: false,
+    reasons,
+  };
+}
+
 function takeTurn(state, id, withLog) {
   const actor = state.players[id];
   const roll = rollForPlayer(state, id);
@@ -574,6 +674,8 @@ function takeTurn(state, id, withLog) {
   if (id !== "boss") {
     if (isGroupB(id)) {
       delta = applyGroupBTurnRules(state, id, roll, delta, reasons);
+    } else if (isGroupC(id)) {
+      delta = applyGroupCTurnRules(state, id, roll, delta, reasons);
     } else {
       const slot = racerSlot(id);
       if (slot === "daphne" && actor.lastRoll === roll) {
@@ -604,6 +706,7 @@ function takeTurn(state, id, withLog) {
   const beforeLanding = moved.to;
   applyLandingRules(state, moved.carried, withLog, reasons);
   applyGroupBAfterMoveRules(state, moved.carried, moved.from, reasons);
+  applyGroupCAfterMoveRules(state, moved.carried, moved.from, reasons);
   actor.hasMoved = true;
   if (!isGroupB(id) && racerSlot(id) === "kat" && !actor.katUsed && actor.position < FINISH && isLastPlace(state, id)) {
     actor.katUsed = true;
@@ -675,6 +778,163 @@ function applyGroupBAfterMoveRules(state, movedIds, from, reasons) {
   actor.electronicGhostUsed = true;
   teleportCarriedGroup(state, movedIds, targetPosition, leader);
   reasons.push(`${SKILL_NAMES[leader]}：傳送到最近團子頂端`);
+}
+
+function applyGroupCRoundStartRules(state, withLog) {
+  const lastIds = [];
+  for (const id of state.playerIds) {
+    const player = state.players[id];
+    player.skipThisRound = false;
+    player.bottomBonusThisRound = false;
+    player.actLastThisRound = false;
+    if (player.actLastNextRound) {
+      player.actLastThisRound = true;
+      player.actLastNextRound = false;
+      lastIds.push(id);
+    }
+    if (player.changliLastChanceNextRound) {
+      player.changliLastChanceNextRound = false;
+      if (Math.random() < 0.65) {
+        player.actLastThisRound = true;
+        lastIds.push(id);
+      }
+    }
+  }
+
+  for (const id of state.playerIds) {
+    if (!isGroupC(id) || state.players[id].finished) continue;
+    const slot = racerSlot(id);
+    if (slot === "lu" && isStackTop(state, id) && hasStackBelow(state, id)) {
+      state.players[id].skipThisRound = true;
+      state.players[id].actLastNextRound = true;
+      addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本回合不行動，下回合最後行動。`, withLog);
+    }
+    if (slot === "daphne" && isStackBottom(state, id) && hasStackAbove(state, id)) {
+      state.players[id].bottomBonusThisRound = true;
+      addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本回合移動 +3。`, withLog);
+    }
+    if (slot === "snow" && hasStackBelow(state, id)) {
+      state.players[id].changliLastChanceNextRound = true;
+      addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，下回合可能最後行動。`, withLog);
+    }
+  }
+
+  if (state.queue.length) moveQueueIdsToEnd(state.queue, lastIds);
+}
+
+function applyGroupCTurnRules(state, id, roll, delta, reasons) {
+  const slot = racerSlot(id);
+  const hasBottomBonus = state.players[id].bottomBonusThisRound || (isStackBottom(state, id) && hasStackAbove(state, id));
+  if (slot === "daphne" && hasBottomBonus) {
+    reasons.push(`${SKILL_NAMES[id]}：額外前進 3 格`);
+    return delta + 3;
+  }
+  if (slot === "fei" && isLastPlace(state, id)) {
+    reasons.push(`${SKILL_NAMES[id]}：最後一名額外前進 3 格`);
+    return delta + 3;
+  }
+  return delta;
+}
+
+function applyGroupCAfterMoveRules(state, movedIds, from, reasons) {
+  const leader = movedIds[0];
+  if (!isGroupC(leader)) return;
+  const slot = racerSlot(leader);
+  if (slot === "west") {
+    applyYounuoAnchor(state, leader, reasons);
+  }
+  if (slot === "kat" && hasStackAbove(state, leader) && Math.random() < 0.4) {
+    moveToHighestStackTop(state, leader);
+    reasons.push(`${SKILL_NAMES[leader]}：移動到最高堆疊頂端`);
+  }
+}
+
+function applyYounuoAnchor(state, leader, reasons) {
+  const actor = state.players[leader];
+  if (actor.anchorUsed || actor.position <= Math.ceil(FINISH / 2) || actor.position >= FINISH) return;
+  const frontPosition = findNearestNonBossStackPosition(state, actor.position, 1, leader);
+  const backPosition = findNearestNonBossStackPosition(state, actor.position, -1, leader);
+  if (!frontPosition || !backPosition) return;
+
+  actor.anchorUsed = true;
+  const frontMoved = moveStackToYounuoHead(state, frontPosition, actor.position);
+  const backMoved = moveStackToYounuoFeet(state, backPosition, actor.position, leader);
+  reasons.push(`${SKILL_NAMES[leader]}：傳送前方 ${frontMoved.length} 顆到頭上、後方 ${backMoved.length} 顆到腳下`);
+}
+
+function moveQueueIdsToEnd(queue, ids) {
+  const idSet = new Set(ids);
+  if (!idSet.size) return;
+  const tail = [];
+  for (let i = queue.length - 1; i >= 0; i--) {
+    if (!idSet.has(queue[i])) continue;
+    tail.unshift(queue[i]);
+    queue.splice(i, 1);
+  }
+  queue.push(...tail);
+}
+
+function isStackTop(state, id) {
+  const stack = state.stacks[state.players[id].position] || [];
+  return stack[stack.length - 1] === id;
+}
+
+function isStackBottom(state, id) {
+  const stack = state.stacks[state.players[id].position] || [];
+  return stack[0] === id;
+}
+
+function hasStackBelow(state, id) {
+  const stack = state.stacks[state.players[id].position] || [];
+  return stack.indexOf(id) > 0;
+}
+
+function hasStackAbove(state, id) {
+  const stack = state.stacks[state.players[id].position] || [];
+  const index = stack.indexOf(id);
+  return index >= 0 && index < stack.length - 1;
+}
+
+function findNearestNonBossStackPosition(state, from, direction, excludeId) {
+  for (let position = from + direction; position >= 1 && position <= FINISH; position += direction) {
+    const stack = state.stacks[position] || [];
+    if (stack.some((id) => id !== "boss" && id !== excludeId && !state.players[id]?.finished)) return position;
+  }
+  return null;
+}
+
+function takeNonBossStack(state, position) {
+  const moving = (state.stacks[position] || []).filter((id) => id !== "boss" && !state.players[id]?.finished);
+  removeIdsFromStack(state.stacks[position], moving);
+  return moving;
+}
+
+function moveStackToYounuoHead(state, from, to) {
+  const moving = takeNonBossStack(state, from);
+  state.stacks[to].push(...moving);
+  for (const id of moving) state.players[id].position = to;
+  return moving;
+}
+
+function moveStackToYounuoFeet(state, from, to, leader) {
+  const moving = takeNonBossStack(state, from);
+  const stack = state.stacks[to];
+  const leaderIndex = stack.indexOf(leader);
+  const insertIndex = leaderIndex >= 0 ? leaderIndex : 0;
+  stack.splice(insertIndex, 0, ...moving);
+  for (const id of moving) state.players[id].position = to;
+  return moving;
+}
+
+function moveToHighestStackTop(state, id) {
+  const target = state.playerIds
+    .filter((pid) => !state.players[pid].finished)
+    .map((pid) => state.players[pid].position)
+    .sort((a, b) => b - a)[0];
+  if (!target) return;
+  removeIdsFromStack(state.stacks[state.players[id].position], [id]);
+  state.stacks[target].push(id);
+  state.players[id].position = target;
 }
 
 function teleportCarriedGroup(state, movedIds, to, topId = null) {

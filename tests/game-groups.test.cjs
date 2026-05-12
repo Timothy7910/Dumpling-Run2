@@ -5,7 +5,7 @@ const path = require("node:path");
 
 const root = path.join(__dirname, "..");
 
-test("game page exposes an A/B group selector beside the title", () => {
+test("game page exposes an A/B/C group selector beside the title", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
   assert.match(html, /id="groupSelect"/);
@@ -14,13 +14,16 @@ test("game page exposes an A/B group selector beside the title", () => {
   assert.match(html, /id="customModal"/);
   assert.match(html, />A組</);
   assert.match(html, />B組</);
+  assert.match(html, />C組</);
 });
 
-test("B group is the default group for new page visits", () => {
+test("C group is the default group for new page visits", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
-  assert.match(script, /DEFAULT_GROUP_ID = "b"/);
+  assert.match(script, /DEFAULT_GROUP_ID = "c"/);
   assert.match(script, /normalizeGroupId\(saved \|\| DEFAULT_GROUP_ID\)/);
+  assert.match(script, /GROUP_DEFAULT_VERSION_STORAGE_KEY/);
+  assert.match(script, /GROUP_DEFAULT_VERSION = "c-group-default"/);
 });
 
 test("B group defines the requested dango racers and assets", () => {
@@ -43,6 +46,63 @@ test("B group has behavior hooks for its custom dice and movement rules", () => 
   assert.match(script, /rollForPlayer/);
   assert.match(script, /applyGroupBTurnRules/);
   assert.match(script, /applyGroupBAfterMoveRules/);
+});
+
+test("C group defines the six requested dango racers", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  for (const name of ["奧古斯塔團子", "尤諾團子", "弗洛洛團子", "長離團子", "今汐團子", "卡卡羅團子"]) {
+    assert.match(script, new RegExp(name));
+  }
+
+  for (const skill of ["總督權柄", "錨定命途", "優雅陰謀", "謀而後定", "今尹之名", "如影隨形"]) {
+    assert.match(script, new RegExp(skill));
+  }
+
+  for (const asset of ["augusta", "younuo", "fuluoluo", "changli", "jinxi", "kakaluo"]) {
+    assert.match(script, new RegExp(`public/dangos/${asset}-raw\\.png`));
+    assert.ok(fs.existsSync(path.join(root, "public", "dangos", `${asset}-raw.png`)));
+  }
+});
+
+test("C group has behavior hooks for round-start, movement, and midpoint rules", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /isGroupC/);
+  assert.match(script, /applyGroupCRoundStartRules/);
+  assert.match(script, /applyGroupCTurnRules/);
+  assert.match(script, /applyGroupCAfterMoveRules/);
+  assert.match(script, /moveQueueIdsToEnd/);
+});
+
+test("C daphne bottom bonus requires another racer stacked above", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /slot === "daphne" && isStackBottom\(state, id\) && hasStackAbove\(state, id\)/);
+  assert.match(script, /const hasBottomBonus = state\.players\[id\]\.bottomBonusThisRound \|\| \(isStackBottom\(state, id\) && hasStackAbove\(state, id\)\)/);
+});
+
+test("C lu top skip requires another racer stacked below", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /slot === "lu" && isStackTop\(state, id\) && hasStackBelow\(state, id\)/);
+});
+
+test("A west marking only runs for the actual A-group west racer", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /function isGroupA\(id\)/);
+  assert.match(script, /racerSlot\(id\) === "west" && isGroupA\(id\)/);
+});
+
+test("C west anchors only the nearest front and back stacks around itself", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /findNearestNonBossStackPosition\(state, actor\.position, 1, leader\)/);
+  assert.match(script, /findNearestNonBossStackPosition\(state, actor\.position, -1, leader\)/);
+  assert.match(script, /moveStackToYounuoHead\(state, frontPosition, actor\.position\)/);
+  assert.match(script, /moveStackToYounuoFeet\(state, backPosition, actor\.position, leader\)/);
+  assert.doesNotMatch(script, /const orderedTargets = \[\.\.\.nonBossBefore, \.\.\.nonBossAfter\]/);
 });
 
 test("stage overlay controls scale with the map on narrow screens", () => {
@@ -76,6 +136,7 @@ test("custom group can select six racers from both groups", () => {
 
   assert.match(script, /CUSTOM_GROUP_ID = "custom"/);
   assert.match(script, /CUSTOM_SELECTION_SIZE = 6/);
+  assert.match(script, /CUSTOM_SOURCE_GROUP_IDS = \["a", "b", "c"\]/);
   assert.match(script, /getCustomRacerOptions/);
   assert.match(script, /activePlayerIds/);
   assert.match(script, /racerSourceGroup/);
