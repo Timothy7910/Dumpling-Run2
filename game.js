@@ -852,7 +852,7 @@ function applyGroupCRoundEndRules(state, withLog) {
   if (!katId) return;
   const actor = state.players[katId];
   if (actor.finished) return;
-  if (hasStackAbove(state, katId) && Math.random() < 0.4) {
+  if (hasNonBossStackAbove(state, katId) && Math.random() < 0.4) {
     moveToCurrentStackTop(state, katId);
     addLog(state, `回合結束，${NAMES[katId]} 發動「${SKILL_NAMES[katId]}」，移動到當前堆疊最上方。`, withLog);
   }
@@ -918,6 +918,13 @@ function hasStackAbove(state, id) {
   const stack = state.stacks[state.players[id].position] || [];
   const index = stack.indexOf(id);
   return index >= 0 && index < stack.length - 1;
+}
+
+function hasNonBossStackAbove(state, id) {
+  const stack = state.stacks[state.players[id].position] || [];
+  const index = stack.indexOf(id);
+  if (index < 0 || index >= stack.length - 1) return false;
+  return stack.slice(index + 1).some((pid) => pid !== "boss");
 }
 
 function findNearestNonBossStackPosition(state, from, direction, excludeId) {
