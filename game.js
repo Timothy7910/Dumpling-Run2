@@ -15,6 +15,10 @@ const GROUP_DEFAULT_VERSION_STORAGE_KEY = "dango-race-group-default-version";
 const GROUP_DEFAULT_VERSION = "c-group-default";
 const CUSTOM_GROUP_STORAGE_KEY = "dango-race-custom-selection";
 const CUSTOM_START_STORAGE_KEY = "dango-race-custom-start-positions";
+const CUSTOM_STACK_STORAGE_KEY = "dango-race-custom-stack-order";
+const CUSTOM_FIRST_QUEUE_STORAGE_KEY = "dango-race-custom-first-queue-order";
+const CUSTOM_RANDOM_ORDER_VALUE = "";
+const CUSTOM_ORDER_VALUES = [1, 2, 3, 4, 5, 6];
 const DEFAULT_GROUP_ID = "c";
 const PIECE_REFERENCE_STAGE_WIDTH = 1040;
 const MIN_PIECE_STAGE_SCALE = 0.34;
@@ -201,6 +205,7 @@ const customGridEl = document.querySelector("#customGrid");
 const customCountEl = document.querySelector("#customCount");
 const customSaveButton = document.querySelector("#customSaveButton");
 const customCancelButton = document.querySelector("#customCancelButton");
+const customResetOrderButton = document.querySelector("#customResetOrderButton");
 
 applyTrackBackground();
 setupGroupSelect();
@@ -348,8 +353,134 @@ function loadCustomStartPositions() {
   }
 }
 
+function loadCustomRankConfig(storageKey) {
+  try {
+    const parsed = JSON.parse(window.localStorage?.getItem(storageKey) || "{}");
+    const valid = getCustomRacerOptions().map((option) => option.id);
+    return Object.fromEntries(
+      Object.entries(parsed || {})
+        .filter(([id, rank]) => valid.includes(id) && CUSTOM_ORDER_VALUES.includes(Number(rank)))
+        .map(([id, rank]) => [id, Number(rank)])
+    );
+  } catch {
+    return {};
+  }
+}
+
+function loadCustomStackOrder() {
+  return loadCustomRankConfig(CUSTOM_STACK_STORAGE_KEY);
+}
+
+function loadCustomFirstQueueOrder() {
+  return loadCustomRankConfig(CUSTOM_FIRST_QUEUE_STORAGE_KEY);
+}
+
 function getCustomStartPosition(id, starts = loadCustomStartPositions()) {
   return CUSTOM_START_POSITIONS.includes(starts[id]) ? starts[id] : 1;
+}
+
+function getCustomRankValue(id, ranks) {
+  return CUSTOM_ORDER_VALUES.includes(ranks[id]) ? String(ranks[id]) : CUSTOM_RANDOM_ORDER_VALUE;
+}
+
+function customRankOptions() {
+  return `<option value="${CUSTOM_RANDOM_ORDER_VALUE}">隨機</option>${CUSTOM_ORDER_VALUES.map((rank) => `<option value="${rank}">${rank}</option>`).join("")}`;
+}
+
+function getCustomPickerRankConfig(selectedIds, type) {
+  const selected = new Set(selectedIds);
+  const config = {};
+  const selector = type === "stack" ? ".custom-stack-select" : ".custom-turn-select";
+  customGridEl?.querySelectorAll(".custom-racer").forEach((card) => {
+    if (!selected.has(card.dataset.id)) return;
+    const rank = Number(card.querySelector(selector)?.value);
+    if (CUSTOM_ORDER_VALUES.includes(rank)) config[card.dataset.id] = rank;
+  });
+  return config;
+}
+
+function resolveCustomRankOrder(playerIds, ranks) {
+  const resolved = {};
+  const used = new Set();
+  const randomIds = [];
+  for (const id of playerIds) {
+    const rank = ranks[id];
+    if (CUSTOM_ORDER_VALUES.includes(rank) && !used.has(rank)) {
+      resolved[id] = rank;
+      used.add(rank);
+    } else {
+      randomIds.push(id);
+    }
+  }
+  const remaining = shuffle(CUSTOM_ORDER_VALUES.filter((rank) => !used.has(rank)));
+  randomIds.forEach((id, index) => {
+    resolved[id] = remaining[index];
+  });
+  return resolved;
+}
+
+function buildCustomFirstQueue(playerIds, customFirstQueueOrder) {
+  const resolved = resolveCustomRankOrder(playerIds, customFirstQueueOrder);
+  return [...playerIds].sort((a, b) => resolved[a] - resolved[b]);
+}
+
+function buildCustomInitialStacks(stacks, players, playerIds, customStackOrder) {
+  const resolved = resolveCustomRankOrder(playerIds, customStackOrder);
+  for (const id of [...playerIds].sort((a, b) => resolved[a] - resolved[b])) {
+    const startPosition = players[id].position;
+    stacks[startPosition].push(id);
+  }
+}
+
+function selectedCustomRankValues(type, selected) {
+  const selector = type === "stack" ? ".custom-stack-select" : ".custom-turn-select";
+  const values = new Map();
+  customGridEl?.querySelectorAll(".custom-racer").forEach((card) => {
+    if (!selected.has(card.dataset.id)) return;
+    const value = card.querySelector(selector)?.value || CUSTOM_RANDOM_ORDER_VALUE;
+    if (value !== CUSTOM_RANDOM_ORDER_VALUE) values.set(card.dataset.id, value);
+  });
+  return values;
+}
+
+function updateCustomRankSelectOptions(selected) {
+  for (const type of ["stack", "firstQueue"]) {
+    const selector = type === "stack" ? ".custom-stack-select" : ".custom-turn-select";
+    const used = selectedCustomRankValues(type, selected);
+    const usedValues = new Set(used.values());
+    customGridEl?.querySelectorAll(".custom-racer").forEach((card) => {
+      const select = card.querySelector(selector);
+      if (!select) return;
+      select.querySelectorAll("option").forEach((option) => {
+        option.disabled =
+          option.value !== CUSTOM_RANDOM_ORDER_VALUE && usedValues.has(option.value) && used.get(card.dataset.id) !== option.value;
+      });
+    });
+  }
+}
+
+function normalizeCustomRankControls(selected) {
+  for (const type of ["stack", "firstQueue"]) {
+    const selector = type === "stack" ? ".custom-stack-select" : ".custom-turn-select";
+    const seen = new Set();
+    customGridEl?.querySelectorAll(".custom-racer").forEach((card) => {
+      const select = card.querySelector(selector);
+      if (!select || !selected.has(card.dataset.id) || select.value === CUSTOM_RANDOM_ORDER_VALUE) return;
+      if (seen.has(select.value)) {
+        select.value = CUSTOM_RANDOM_ORDER_VALUE;
+        return;
+      }
+      seen.add(select.value);
+    });
+  }
+}
+
+function resetCustomRankControls(event) {
+  event?.stopPropagation();
+  customGridEl?.querySelectorAll(".custom-stack-select, .custom-turn-select").forEach((select) => {
+    select.value = CUSTOM_RANDOM_ORDER_VALUE;
+  });
+  updateCustomRankSelectOptions(getCustomPickerSelection());
 }
 
 function colorFor(id) {
@@ -360,7 +491,10 @@ function setupCustomPicker() {
   if (!customModalEl || !customGridEl) return;
   customGridEl.innerHTML = "";
   const selected = new Set(loadCustomSelection());
+  const selectedIds = [...selected];
   const starts = loadCustomStartPositions();
+  const stackOrder = loadCustomStackOrder();
+  const firstQueueOrder = loadCustomFirstQueueOrder();
   for (const option of getCustomRacerOptions()) {
     const card = document.createElement("div");
     card.className = "custom-racer";
@@ -377,10 +511,31 @@ function setupCustomPicker() {
           ${CUSTOM_START_POSITIONS.map((position) => `<option value="${position}">${position}</option>`).join("")}
         </select>
       </label>
+      <div class="custom-rank-controls">
+        <label>
+          <span>堆疊(6上)</span>
+          <select class="custom-stack-select" data-stack-order aria-label="${option.name} 初始堆疊層級">
+            ${customRankOptions()}
+          </select>
+        </label>
+        <label>
+          <span>首回合</span>
+          <select class="custom-turn-select" data-first-queue-order aria-label="${option.name} 第一回合行動順序">
+            ${customRankOptions()}
+          </select>
+        </label>
+      </div>
     `;
     card.querySelector(".custom-start-select").value = getCustomStartPosition(option.id, starts);
-    card.querySelector(".custom-start-select").addEventListener("click", (event) => event.stopPropagation());
-    card.querySelector(".custom-start-select").addEventListener("change", (event) => event.stopPropagation());
+    card.querySelector(".custom-stack-select").value = getCustomRankValue(option.id, stackOrder);
+    card.querySelector(".custom-turn-select").value = getCustomRankValue(option.id, firstQueueOrder);
+    card.querySelectorAll("select").forEach((select) => {
+      select.addEventListener("click", (event) => event.stopPropagation());
+      select.addEventListener("change", (event) => {
+        event.stopPropagation();
+        updateCustomRankSelectOptions(getCustomPickerSelection());
+      });
+    });
     const toggle = () => {
       const current = getCustomPickerSelection();
       if (current.has(option.id)) {
@@ -400,6 +555,7 @@ function setupCustomPicker() {
   }
   customSaveButton?.addEventListener("click", saveCustomSelection);
   customCancelButton?.addEventListener("click", closeCustomPicker);
+  customResetOrderButton?.addEventListener("click", resetCustomRankControls);
   customModalEl.addEventListener("click", (event) => {
     if (event.target === customModalEl) closeCustomPicker();
   });
@@ -434,6 +590,7 @@ function getCustomPickerStartPositions(selectedIds) {
 }
 
 function renderCustomPickerSelection(selected) {
+  normalizeCustomRankControls(selected);
   customGridEl?.querySelectorAll(".custom-racer").forEach((card) => {
     const isSelected = selected.has(card.dataset.id);
     const isLocked = !isSelected && selected.size >= CUSTOM_SELECTION_SIZE;
@@ -441,9 +598,11 @@ function renderCustomPickerSelection(selected) {
     card.classList.toggle("disabled", isLocked);
     card.setAttribute("aria-pressed", String(isSelected));
     card.setAttribute("aria-disabled", String(isLocked));
-    const startSelect = card.querySelector(".custom-start-select");
-    if (startSelect) startSelect.disabled = !isSelected;
+    card.querySelectorAll("select").forEach((select) => {
+      select.disabled = !isSelected;
+    });
   });
+  updateCustomRankSelectOptions(selected);
   if (customCountEl) customCountEl.textContent = `${selected.size}/${CUSTOM_SELECTION_SIZE}`;
   if (customSaveButton) customSaveButton.disabled = selected.size !== CUSTOM_SELECTION_SIZE;
 }
@@ -453,6 +612,8 @@ function saveCustomSelection() {
   if (selected.length !== CUSTOM_SELECTION_SIZE) return;
   window.localStorage?.setItem(CUSTOM_GROUP_STORAGE_KEY, JSON.stringify(selected));
   window.localStorage?.setItem(CUSTOM_START_STORAGE_KEY, JSON.stringify(getCustomPickerStartPositions(selected)));
+  window.localStorage?.setItem(CUSTOM_STACK_STORAGE_KEY, JSON.stringify(getCustomPickerRankConfig(selected, "stack")));
+  window.localStorage?.setItem(CUSTOM_FIRST_QUEUE_STORAGE_KEY, JSON.stringify(getCustomPickerRankConfig(selected, "firstQueue")));
   activeGroupId = CUSTOM_GROUP_ID;
   window.localStorage?.setItem(GROUP_STORAGE_KEY, activeGroupId);
   stopAuto();
@@ -468,6 +629,8 @@ function saveCustomSelection() {
 function createGame() {
   const playerIds = activePlayerIds();
   const customStartPositions = activeGroupId === CUSTOM_GROUP_ID ? loadCustomStartPositions() : {};
+  const customStackOrder = activeGroupId === CUSTOM_GROUP_ID ? loadCustomStackOrder() : {};
+  const customFirstQueueOrder = activeGroupId === CUSTOM_GROUP_ID ? loadCustomFirstQueueOrder() : {};
   const stacks = Array.from({ length: TRACK_LENGTH + 1 }, () => []);
   const players = {};
   for (const id of playerIds) {
@@ -494,10 +657,15 @@ function createGame() {
       augustaCooldownNextRound: false,
     };
   }
-  const firstQueue = shuffle(playerIds);
-  for (const id of [...firstQueue].reverse()) {
-    const startPosition = players[id].position;
-    stacks[startPosition].push(id);
+  const firstQueue =
+    activeGroupId === CUSTOM_GROUP_ID ? buildCustomFirstQueue(playerIds, customFirstQueueOrder) : shuffle(playerIds);
+  if (activeGroupId === CUSTOM_GROUP_ID) {
+    buildCustomInitialStacks(stacks, players, playerIds, customStackOrder);
+  } else {
+    for (const id of [...firstQueue].reverse()) {
+      const startPosition = players[id].position;
+      stacks[startPosition].push(id);
+    }
   }
   players.boss = {
     id: "boss",

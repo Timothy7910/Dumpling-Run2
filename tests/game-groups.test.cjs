@@ -174,6 +174,31 @@ test("custom group can assign starting positions from the allowed late-race cell
   assert.match(styles, /\.custom-start-control/);
 });
 
+test("custom group can assign stack order and first round action order", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+
+  assert.match(script, /CUSTOM_STACK_STORAGE_KEY/);
+  assert.match(script, /CUSTOM_FIRST_QUEUE_STORAGE_KEY/);
+  assert.match(script, /CUSTOM_RANDOM_ORDER_VALUE = ""/);
+  assert.match(script, /loadCustomStackOrder/);
+  assert.match(script, /loadCustomFirstQueueOrder/);
+  assert.match(script, /resolveCustomRankOrder/);
+  assert.match(script, /updateCustomRankSelectOptions/);
+  assert.match(script, /normalizeCustomRankControls/);
+  assert.match(script, /resetCustomRankControls/);
+  assert.match(script, /getCustomPickerRankConfig\(selected, "stack"\)/);
+  assert.match(script, /getCustomPickerRankConfig\(selected, "firstQueue"\)/);
+  assert.match(script, /buildCustomFirstQueue\(playerIds, customFirstQueueOrder\)/);
+  assert.match(script, /buildCustomInitialStacks\(stacks, players, playerIds, customStackOrder\)/);
+  assert.match(script, /class="custom-stack-select"/);
+  assert.match(script, /class="custom-turn-select"/);
+  assert.match(script, /<option value="\$\{CUSTOM_RANDOM_ORDER_VALUE\}">隨機<\/option>/);
+  assert.match(html, /id="customResetOrderButton"/);
+  assert.match(styles, /\.custom-rank-controls/);
+});
+
 test("custom racers starting near the finish must complete a full lap before finishing", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
