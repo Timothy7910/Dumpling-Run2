@@ -418,6 +418,52 @@ h2 {
   visibility: hidden;
 }
 
+.skill-callout {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  width: calc(220px * var(--stage-scale));
+  min-height: calc(74px * var(--stage-scale));
+  display: grid;
+  place-items: center;
+  padding: calc(14px * var(--stage-scale)) calc(20px * var(--stage-scale));
+  border: calc(5px * var(--stage-scale)) solid #ef1f24;
+  border-radius: 46% 54% 48% 52% / 58% 44% 56% 42%;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.82) 42%, rgba(255, 255, 255, 0.96) 100%);
+  color: #22384f;
+  font-size: calc(1.35rem * var(--stage-scale));
+  font-weight: 950;
+  line-height: 1.05;
+  text-align: center;
+  text-shadow: 0 2px 0 #ffffff, 0 4px 0 rgba(142, 188, 220, 0.45);
+  filter: drop-shadow(calc(10px * var(--stage-scale)) calc(10px * var(--stage-scale)) 0 rgba(0, 0, 0, 0.25));
+  transform: translate(calc(16px * var(--stage-scale)), calc(-188px * var(--stage-scale))) rotate(-4deg) scale(0.88);
+  transform-origin: 8% 92%;
+  z-index: var(--z);
+  pointer-events: none;
+  animation: skill-callout-pop 500ms cubic-bezier(0.18, 1.4, 0.32, 1) both;
+}
+
+@keyframes skill-callout-pop {
+  0% {
+    opacity: 0;
+    transform: translate(calc(8px * var(--stage-scale)), calc(-160px * var(--stage-scale))) rotate(-8deg) scale(0.34);
+  }
+  42% {
+    opacity: 1;
+    transform: translate(calc(18px * var(--stage-scale)), calc(-192px * var(--stage-scale))) rotate(2deg) scale(1.08);
+  }
+  72% {
+    opacity: 1;
+    transform: translate(calc(16px * var(--stage-scale)), calc(-188px * var(--stage-scale))) rotate(-4deg) scale(0.96);
+  }
+  100% {
+    opacity: 0.98;
+    transform: translate(calc(16px * var(--stage-scale)), calc(-188px * var(--stage-scale))) rotate(-4deg) scale(1);
+  }
+}
+
 .players {
   display: grid;
   gap: 10px;

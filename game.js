@@ -490,6 +490,8 @@ function createGame() {
       bottomBonusThisRound: false,
       changliLastChanceNextRound: false,
       anchorUsed: false,
+      augustaCooldownThisRound: false,
+      augustaCooldownNextRound: false,
     };
   }
   const firstQueue = shuffle(playerIds);
@@ -709,7 +711,7 @@ function takeTurn(state, id, withLog) {
   applyGroupCAfterMoveRules(state, moved.carried, moved.from, reasons);
   applyJinxiLandingTrigger(state, id, moved.to, withLog, reasons);
   actor.hasMoved = true;
-  if (!isGroupB(id) && racerSlot(id) === "kat" && !actor.katUsed && actor.position < FINISH && isLastPlace(state, id)) {
+  if (isGroupA(id) && racerSlot(id) === "kat" && !actor.katUsed && actor.position < FINISH && isLastPlace(state, id)) {
     actor.katUsed = true;
     reasons.push(`${SKILL_NAMES[id]}：落後狀態啟動`);
   }
@@ -788,6 +790,8 @@ function applyGroupCRoundStartRules(state, withLog) {
     player.skipThisRound = false;
     player.bottomBonusThisRound = false;
     player.actLastThisRound = false;
+    player.augustaCooldownThisRound = player.augustaCooldownNextRound;
+    player.augustaCooldownNextRound = false;
     if (player.actLastNextRound) {
       player.actLastThisRound = true;
       player.actLastNextRound = false;
@@ -805,9 +809,10 @@ function applyGroupCRoundStartRules(state, withLog) {
   for (const id of state.playerIds) {
     if (!isGroupC(id) || state.players[id].finished) continue;
     const slot = racerSlot(id);
-    if (slot === "lu" && isStackTop(state, id) && hasNonBossStackBelow(state, id)) {
+    if (slot === "lu" && !state.players[id].augustaCooldownThisRound && isStackTop(state, id) && hasNonBossStackBelow(state, id)) {
       state.players[id].skipThisRound = true;
       state.players[id].actLastNextRound = true;
+      state.players[id].augustaCooldownNextRound = true;
       addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本回合不行動，下回合最後行動。`, withLog);
     }
     if (slot === "daphne" && isStackBottom(state, id) && hasStackAbove(state, id)) {
@@ -1189,6 +1194,7 @@ async function animateTurn(event) {
   diceEl.classList.add("roll");
   turnInfoEl.textContent = `${NAMES[event.id]}：${event.reasons.join("，")}`;
   await wait(420);
+  await showSkillCallouts(getSkillCallouts(event));
 
   const fromPoint = cellPoint(event.from);
   const moving = event.carried.map((id, index) => {
@@ -1217,6 +1223,37 @@ async function animateTurn(event) {
   moving.forEach((img) => img.remove());
   hidePieces(event.carried, false);
   diceEl.classList.remove("roll");
+}
+
+function getSkillCallouts(event) {
+  const ids = [...new Set([event.id, ...game.playerIds])];
+  return ids
+    .map((id) => ({ id, skillName: SKILL_NAMES[id] }))
+    .filter(({ skillName }) => skillName && event.reasons.some((reason) => reason.includes(skillName)))
+    .map(({ id, skillName }) => ({
+      id,
+      skillName,
+      position: id === event.id ? event.from : game.players[id]?.position,
+    }))
+    .filter(({ position }) => Number.isFinite(position));
+}
+
+async function showSkillCallouts(callouts) {
+  if (!callouts.length) return;
+  const nodes = callouts.map(({ id, skillName, position }, index) => {
+    const point = cellPoint(position);
+    const bubble = document.createElement("div");
+    bubble.className = "skill-callout";
+    bubble.textContent = skillName;
+    bubble.style.setProperty("--x", point.x);
+    bubble.style.setProperty("--y", point.y);
+    bubble.style.setProperty("--z", 420 + index);
+    bubble.style.setProperty("--accent", colorFor(id));
+    moversEl.appendChild(bubble);
+    return bubble;
+  });
+  await wait(500);
+  nodes.forEach((node) => node.remove());
 }
 
 function buildPath(from, to, wrapped = false) {

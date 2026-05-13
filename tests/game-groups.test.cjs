@@ -85,7 +85,10 @@ test("C daphne bottom bonus requires another racer stacked above", () => {
 test("C lu top skip requires another racer stacked below", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
-  assert.match(script, /slot === "lu" && isStackTop\(state, id\) && hasStackBelow\(state, id\)/);
+  assert.match(script, /slot === "lu" && !state\.players\[id\]\.augustaCooldownThisRound && isStackTop\(state, id\) && hasNonBossStackBelow\(state, id\)/);
+  assert.match(script, /augustaCooldownNextRound/);
+  assert.match(script, /augustaCooldownThisRound/);
+  assert.match(script, /slot === "lu" && !state\.players\[id\]\.augustaCooldownThisRound && isStackTop\(state, id\) && hasNonBossStackBelow\(state, id\)/);
 });
 
 test("A west marking only runs for the actual A-group west racer", () => {
@@ -93,6 +96,14 @@ test("A west marking only runs for the actual A-group west racer", () => {
 
   assert.match(script, /function isGroupA\(id\)/);
   assert.match(script, /racerSlot\(id\) === "west" && isGroupA\(id\)/);
+});
+
+test("A-only racer skills do not run for B or C racers sharing the same slot", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /isGroupA\(id\) && racerSlot\(id\) === "kat" && !actor\.katUsed/);
+  assert.match(script, /const isALu = isGroupA\(leader\) && racerSlot\(leader\) === "lu"/);
+  assert.doesNotMatch(script, /!isGroupB\(id\) && racerSlot\(id\) === "kat"/);
 });
 
 test("C west anchors only the nearest front and back stacks around itself", () => {
@@ -202,4 +213,16 @@ test("map removes transient text overlays and first-place spotlight", () => {
   assert.doesNotMatch(script, /showSkillNotice/);
   assert.doesNotMatch(script, /showSpotlight/);
   assert.doesNotMatch(script, /cell\.textContent/);
+});
+
+test("skill callouts appear beside racers and pause before movement", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(script, /getSkillCallouts\(event\)/);
+  assert.match(script, /await showSkillCallouts\(getSkillCallouts\(event\)\)/);
+  assert.match(script, /await wait\(500\)/);
+  assert.match(script, /className = "skill-callout"/);
+  assert.match(styles, /\.skill-callout/);
+  assert.match(styles, /skill-callout-pop/);
 });
