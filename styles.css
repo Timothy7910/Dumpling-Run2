@@ -298,6 +298,34 @@ h2 {
   transform-origin: top right;
 }
 
+.stage-status {
+  position: absolute;
+  left: clamp(12px, 2vw, 24px);
+  top: clamp(12px, 2vw, 24px);
+  z-index: 82;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  max-width: min(420px, 52%);
+  transform: scale(var(--stage-scale));
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+.stage-status p {
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid rgba(39, 111, 171, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+  color: #25465c;
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1.25;
+  box-shadow: 0 8px 18px rgba(112, 177, 213, 0.14);
+  overflow-wrap: anywhere;
+}
+
 .stage-controls button {
   min-height: 44px;
   padding: 0 18px;
@@ -969,7 +997,7 @@ button.ghost {
 .game-body .stage-panel {
   min-height: 100dvh;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   padding: clamp(92px, 12vh, 124px) clamp(6px, 0.75vw, 12px) clamp(8px, 1vw, 12px);
   border: 0;
   border-radius: 0;
@@ -977,20 +1005,6 @@ button.ghost {
     linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(218, 243, 255, 0.48)),
     transparent;
   box-shadow: none;
-}
-
-.game-body .stage-head {
-  width: 100%;
-  margin: 0 auto 10px;
-  padding: 10px 14px;
-  border: 2px solid rgba(39, 111, 171, 0.46);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(201, 235, 255, 0.9));
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, 0.74),
-    0 8px 0 rgba(126, 191, 226, 0.2),
-    0 16px 28px rgba(111, 172, 207, 0.2);
 }
 
 .game-body .stage.custom-map {
@@ -1476,10 +1490,6 @@ button.ghost {
   .game-body .stage-panel {
     min-height: 100dvh;
     padding: 132px 6px 12px;
-  }
-
-  .game-body .stage-head {
-    padding: 8px 10px;
   }
 
   .game-body .stage.custom-map {

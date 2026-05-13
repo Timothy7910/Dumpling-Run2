@@ -70,9 +70,23 @@ test("C group has behavior hooks for round-start, movement, and midpoint rules",
 
   assert.match(script, /isGroupC/);
   assert.match(script, /applyGroupCRoundStartRules/);
+  assert.match(script, /applyGroupCRoundEndRules/);
   assert.match(script, /applyGroupCTurnRules/);
   assert.match(script, /applyGroupCAfterMoveRules/);
   assert.match(script, /moveQueueIdsToEnd/);
+});
+
+test("C snow checks its below-stack condition at round end for next round", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const startRulesStart = script.indexOf("function applyGroupCRoundStartRules(state, withLog)");
+  const endRulesStart = script.indexOf("function applyGroupCRoundEndRules(state, withLog)");
+  const startRules = script.slice(startRulesStart, endRulesStart);
+
+  assert.match(script, /function finishRound\(state, withLog\)/);
+  assert.match(script, /applyBossRoundEndRule\(state, withLog\);[\s\S]*applyGroupCRoundEndRules\(state, withLog\);/);
+  assert.match(script, /function applyGroupCRoundEndRules\(state, withLog\)/);
+  assert.match(script, /slot === "snow" && hasStackBelow\(state, id\)/);
+  assert.doesNotMatch(startRules, /slot === "snow" && hasStackBelow\(state, id\)/);
 });
 
 test("C daphne bottom bonus requires another racer stacked above", () => {
@@ -80,6 +94,7 @@ test("C daphne bottom bonus requires another racer stacked above", () => {
 
   assert.match(script, /slot === "daphne" && isStackBottom\(state, id\) && hasStackAbove\(state, id\)/);
   assert.match(script, /const hasBottomBonus = state\.players\[id\]\.bottomBonusThisRound \|\| \(isStackBottom\(state, id\) && hasStackAbove\(state, id\)\)/);
+  assert.match(script, /function isStackBottom\(state, id\)[\s\S]*return stack\[0\] === id/);
 });
 
 test("C lu top skip requires another racer stacked below", () => {
@@ -89,6 +104,27 @@ test("C lu top skip requires another racer stacked below", () => {
   assert.match(script, /augustaCooldownNextRound/);
   assert.match(script, /augustaCooldownThisRound/);
   assert.match(script, /slot === "lu" && !state\.players\[id\]\.augustaCooldownThisRound && isStackTop\(state, id\) && hasNonBossStackBelow\(state, id\)/);
+});
+
+test("C lu zero-step skip can trigger C kat landing skill when stopped above kat", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /function applyZeroStepLandingRules\(state, id, withLog, reasons\)/);
+  assert.match(script, /isGroupC\(id\) && racerSlot\(id\) === "lu"/);
+  assert.match(script, /applyJinxiLandingTrigger\(state, id, state\.players\[id\]\.position, withLog, reasons\)/);
+  assert.match(script, /applyZeroStepLandingRules\(state, id, withLog, reasons\)/);
+});
+
+test("boss affects C fei last-place checks and returns to finish when last at round end", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /function getRaceRankingIncludingBoss\(state\)/);
+  assert.match(script, /function isLastPlaceIncludingBoss\(state, id\)/);
+  assert.match(script, /slot === "fei" && isLastPlaceIncludingBoss\(state, id\)/);
+  assert.match(script, /function isBossLastPlace\(state\)/);
+  assert.match(script, /if \(!isBossLastPlace\(state\)\) return/);
+  assert.match(script, /state\.stacks\[FINISH\]\.unshift\("boss"\)/);
+  assert.match(script, /我還會回來的/);
 });
 
 test("A west marking only runs for the actual A-group west racer", () => {
@@ -113,13 +149,16 @@ test("A-only racer skills do not run for B or C racers sharing the same slot", (
   assert.doesNotMatch(script, /!isGroupB\(id\) && racerSlot\(id\) === "kat"/);
 });
 
-test("C west anchors only the nearest front and back stacks around itself", () => {
+test("C west anchors every non-boss stack around itself", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
-  assert.match(script, /findNearestNonBossStackPosition\(state, actor\.position, 1, leader\)/);
-  assert.match(script, /findNearestNonBossStackPosition\(state, actor\.position, -1, leader\)/);
+  assert.match(script, /collectNonBossStackPositions\(state, actor\.position, 1, leader\)/);
+  assert.match(script, /collectNonBossStackPositions\(state, actor\.position, -1, leader\)/);
+  assert.match(script, /for \(const frontPosition of frontPositions\)/);
+  assert.match(script, /for \(const backPosition of backPositions\)/);
   assert.match(script, /moveStackToYounuoHead\(state, frontPosition, actor\.position\)/);
   assert.match(script, /moveStackToYounuoFeet\(state, backPosition, actor\.position, leader\)/);
+  assert.doesNotMatch(script, /findNearestNonBossStackPosition/);
   assert.doesNotMatch(script, /const orderedTargets = \[\.\.\.nonBossBefore, \.\.\.nonBossAfter\]/);
 });
 
@@ -132,6 +171,19 @@ test("stage overlay controls scale with the map on narrow screens", () => {
   assert.match(styles, /\.dice[\s\S]*--stage-scale/);
   assert.match(styles, /\.stage-controls[\s\S]*--stage-scale/);
   assert.match(styles, /\.cell[\s\S]*--stage-scale/);
+});
+
+test("stage header removes track title and round badge overlays the map", () => {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.doesNotMatch(html, /<h2>32 格圓形賽道<\/h2>/);
+  assert.doesNotMatch(html, /<div class="stage-head">/);
+  assert.match(html, /<div id="stage" class="stage"[\s\S]*<div class="stage-status"[\s\S]*<span id="roundInfo" class="pill stage-round-pill">/);
+  assert.match(styles, /\.stage-status\s*\{/);
+  assert.match(styles, /\.stage-status[\s\S]*position: absolute/);
+  assert.match(styles, /\.stage-status[\s\S]*left:/);
+  assert.match(styles, /\.stage-status[\s\S]*top:/);
 });
 
 test("custom map keeps coordinate overlays aligned on mobile", () => {

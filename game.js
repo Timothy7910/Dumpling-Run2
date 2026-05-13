@@ -138,7 +138,7 @@ const GROUPS = {
       west: {
         name: "尤諾團子",
         skillName: "錨定命途",
-        note: "每場一次，過中點後若前後有非布大王團子，會把它們傳送到自己格",
+        note: "每場一次，過中點後會把除了布大王以外的全部團子傳送到自己格",
         asset: "public/dangos/younuo-raw.png",
       },
       daphne: {
@@ -722,8 +722,7 @@ function stepGame(state, withLog = false) {
     const event = skipTurn(state, id, withLog);
     event.newRanks = recordFinishers(state, withLog);
     if (!state.finished && state.queue.length === 0) {
-      applyBossRoundEndRule(state, withLog);
-      state.round += 1;
+      finishRound(state, withLog);
     }
     state.lastEvent = event;
     return event;
@@ -731,11 +730,16 @@ function stepGame(state, withLog = false) {
   const event = takeTurn(state, id, withLog);
   event.newRanks = recordFinishers(state, withLog);
   if (!state.finished && state.queue.length === 0) {
-    applyBossRoundEndRule(state, withLog);
-    state.round += 1;
+    finishRound(state, withLog);
   }
   state.lastEvent = event;
   return event;
+}
+
+function finishRound(state, withLog) {
+  applyBossRoundEndRule(state, withLog);
+  applyGroupCRoundEndRules(state, withLog);
+  state.round += 1;
 }
 
 function beginRound(state, withLog) {
@@ -786,7 +790,11 @@ function compareStanding(state, a, b) {
   const aIndex = stack.indexOf(a);
   const bIndex = stack.indexOf(b);
   if (aIndex >= 0 && bIndex >= 0) return bIndex - aIndex;
-  return state.playerIds.indexOf(a) - state.playerIds.indexOf(b);
+  return raceOrderIndex(state, a) - raceOrderIndex(state, b);
+}
+
+function raceOrderIndex(state, id) {
+  return id === "boss" ? state.playerIds.length : state.playerIds.indexOf(id);
 }
 
 function prepareRoundRolls(state) {
@@ -823,6 +831,7 @@ function skipTurn(state, id, withLog) {
   actor.hasMoved = true;
   const reasons = [`${SKILL_NAMES[id]}：本回合不行動`];
   addLog(state, `${NAMES[id]} 因 ${SKILL_NAMES[id]} 暫停行動。`, withLog);
+  applyZeroStepLandingRules(state, id, withLog, reasons);
   return {
     id,
     roll: "-",
@@ -833,6 +842,11 @@ function skipTurn(state, id, withLog) {
     wrapped: false,
     reasons,
   };
+}
+
+function applyZeroStepLandingRules(state, id, withLog, reasons) {
+  if (!(isGroupC(id) && racerSlot(id) === "lu")) return;
+  applyJinxiLandingTrigger(state, id, state.players[id].position, withLog, reasons);
 }
 
 function takeTurn(state, id, withLog) {
@@ -987,13 +1001,20 @@ function applyGroupCRoundStartRules(state, withLog) {
       state.players[id].bottomBonusThisRound = true;
       addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本回合移動 +3。`, withLog);
     }
+  }
+
+  if (state.queue.length) moveQueueIdsToEnd(state.queue, lastIds);
+}
+
+function applyGroupCRoundEndRules(state, withLog) {
+  for (const id of state.playerIds) {
+    if (!isGroupC(id) || state.players[id].finished) continue;
+    const slot = racerSlot(id);
     if (slot === "snow" && hasStackBelow(state, id)) {
       state.players[id].changliLastChanceNextRound = true;
       addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，下回合可能最後行動。`, withLog);
     }
   }
-
-  if (state.queue.length) moveQueueIdsToEnd(state.queue, lastIds);
 }
 
 function applyGroupCTurnRules(state, id, roll, delta, reasons) {
@@ -1003,7 +1024,7 @@ function applyGroupCTurnRules(state, id, roll, delta, reasons) {
     reasons.push(`${SKILL_NAMES[id]}：額外前進 3 格`);
     return delta + 3;
   }
-  if (slot === "fei" && isLastPlace(state, id)) {
+  if (slot === "fei" && isLastPlaceIncludingBoss(state, id)) {
     reasons.push(`${SKILL_NAMES[id]}：最後一名額外前進 3 格`);
     return delta + 3;
   }
@@ -1038,13 +1059,19 @@ function applyJinxiLandingTrigger(state, landingId, landingPos, withLog, reasons
 function applyYounuoAnchor(state, leader, reasons) {
   const actor = state.players[leader];
   if (actor.anchorUsed || actor.position <= Math.ceil(FINISH / 2) || actor.position >= FINISH) return;
-  const frontPosition = findNearestNonBossStackPosition(state, actor.position, 1, leader);
-  const backPosition = findNearestNonBossStackPosition(state, actor.position, -1, leader);
-  if (!frontPosition || !backPosition) return;
+  const frontPositions = collectNonBossStackPositions(state, actor.position, 1, leader);
+  const backPositions = collectNonBossStackPositions(state, actor.position, -1, leader);
+  if (!frontPositions.length && !backPositions.length) return;
 
   actor.anchorUsed = true;
-  const frontMoved = moveStackToYounuoHead(state, frontPosition, actor.position);
-  const backMoved = moveStackToYounuoFeet(state, backPosition, actor.position, leader);
+  const frontMoved = [];
+  const backMoved = [];
+  for (const frontPosition of frontPositions) {
+    frontMoved.push(...moveStackToYounuoHead(state, frontPosition, actor.position));
+  }
+  for (const backPosition of backPositions) {
+    backMoved.push(...moveStackToYounuoFeet(state, backPosition, actor.position, leader));
+  }
   reasons.push(`${SKILL_NAMES[leader]}：傳送前方 ${frontMoved.length} 顆到頭上、後方 ${backMoved.length} 顆到腳下`);
 }
 
@@ -1104,12 +1131,13 @@ function hasNonBossStackAbove(state, id) {
   return stack.slice(index + 1).some((pid) => pid !== "boss");
 }
 
-function findNearestNonBossStackPosition(state, from, direction, excludeId) {
+function collectNonBossStackPositions(state, from, direction, excludeId) {
+  const positions = [];
   for (let position = from + direction; position >= 1 && position <= FINISH; position += direction) {
     const stack = state.stacks[position] || [];
-    if (stack.some((id) => id !== "boss" && id !== excludeId && !state.players[id]?.finished)) return position;
+    if (stack.some((id) => id !== "boss" && id !== excludeId && !state.players[id]?.finished)) positions.push(position);
   }
-  return null;
+  return positions;
 }
 
 function takeNonBossStack(state, position) {
@@ -1301,18 +1329,16 @@ function openTimeRift(state, position, withLog) {
 
 function applyBossRoundEndRule(state, withLog) {
   const boss = state.players.boss;
-  if (!boss.active || boss.position === FINISH) return;
+  if (!boss.active) return;
   const stack = state.stacks[boss.position];
   const bossIndex = stack.indexOf("boss");
   if (bossIndex < 0) return;
-  if (bossIndex >= 0 && bossIndex < stack.length - 1) return;
-  const last = getLastNonBoss(state);
-  if (!last || last.position <= boss.position) return;
+  if (!isBossLastPlace(state)) return;
 
   stack.splice(bossIndex, 1);
   state.stacks[FINISH].unshift("boss");
   boss.position = FINISH;
-  addLog(state, "最後一名超過布大王，布大王傳送回終點。", withLog);
+  addLog(state, "布大王發動「我還會回來的」，傳回終點，下回合重新出發。", withLog);
 }
 
 function checkBossMeeting(state, ids, position) {
@@ -1346,6 +1372,21 @@ function recordFinishers(state, withLog) {
 function isLastPlace(state, id) {
   const ranking = getRaceRanking(state);
   return ranking.length > 1 && ranking[ranking.length - 1] === id;
+}
+
+function getRaceRankingIncludingBoss(state) {
+  const ids = state.playerIds.filter((id) => !state.players[id].finished);
+  if (state.players.boss.active && !state.players.boss.finished) ids.push("boss");
+  return ids.sort((a, b) => compareStanding(state, a, b));
+}
+
+function isLastPlaceIncludingBoss(state, id) {
+  const ranking = getRaceRankingIncludingBoss(state);
+  return ranking.length > 1 && ranking[ranking.length - 1] === id;
+}
+
+function isBossLastPlace(state) {
+  return isLastPlaceIncludingBoss(state, "boss");
 }
 
 function getLastNonBoss(state) {

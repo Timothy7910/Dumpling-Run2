@@ -28,15 +28,11 @@
 
       <section class="play-layout">
         <div class="stage-panel">
-          <div class="stage-head">
-            <div>
-              <h2>32 格圓形賽道</h2>
+          <div id="stage" class="stage" aria-label="圓形賽道遊戲區">
+            <div class="stage-status" aria-live="polite">
+              <span id="roundInfo" class="pill stage-round-pill">第 1 回合</span>
               <p id="turnInfo">準備開始</p>
             </div>
-            <span id="roundInfo" class="pill">第 1 回合</span>
-          </div>
-
-          <div id="stage" class="stage" aria-label="圓形賽道遊戲區">
             <div class="stage-controls" aria-label="回合控制">
               <button id="stepButton" type="button">擲下一顆</button>
               <button id="autoButton" type="button">自動跑完</button>
