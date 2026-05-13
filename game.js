@@ -698,7 +698,7 @@ function takeTurn(state, id, withLog) {
       }
     }
     if (actor.westMarked) {
-      delta = Math.max(0, delta - 1);
+      delta = Math.max(1, delta - 1);
       reasons.push(`標記 -1`);
     }
   }

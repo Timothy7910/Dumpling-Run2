@@ -98,6 +98,13 @@ test("A west marking only runs for the actual A-group west racer", () => {
   assert.match(script, /racerSlot\(id\) === "west" && isGroupA\(id\)/);
 });
 
+test("A west mark subtracts one from movement but never below one", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /delta = Math\.max\(1, delta - 1\)/);
+  assert.doesNotMatch(script, /delta = Math\.max\(0, delta - 1\)/);
+});
+
 test("A-only racer skills do not run for B or C racers sharing the same slot", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
