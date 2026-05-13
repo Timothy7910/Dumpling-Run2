@@ -223,6 +223,16 @@ test("custom map keeps coordinate overlays aligned on mobile", () => {
   assert.doesNotMatch(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.stage\.custom-map\s*\{[\s\S]*height:\s*100%/);
 });
 
+test("mobile game layout removes tall blank space around the stage", () => {
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.topbar\s*\{[\s\S]*position: static/);
+  assert.match(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.stage-panel\s*\{[\s\S]*min-height: auto/);
+  assert.match(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.stage-panel\s*\{[\s\S]*padding: 6px/);
+  assert.doesNotMatch(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.stage-panel\s*\{[\s\S]*min-height:\s*100dvh/);
+  assert.doesNotMatch(styles, /@media \(max-width: 560px\)[\s\S]*\.game-body \.stage-panel\s*\{[\s\S]*padding:\s*132px/);
+});
+
 test("transparent racer pieces avoid rectangular image shadows", () => {
   const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
   const pieceRule = styles.match(/\.piece,\s*\.moving-piece\s*\{[\s\S]*?\n\}/)?.[0] || "";
