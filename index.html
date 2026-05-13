@@ -29,10 +29,8 @@
       <section class="play-layout">
         <div class="stage-panel">
           <div id="stage" class="stage" aria-label="圓形賽道遊戲區">
-            <div class="stage-status" aria-live="polite">
-              <span id="roundInfo" class="pill stage-round-pill">第 1 回合</span>
-              <p id="turnInfo">準備開始</p>
-            </div>
+            <div id="stageRanking" class="stage-ranking" aria-live="polite"></div>
+            <div id="turnOrder" class="turn-order" aria-live="polite"></div>
             <div class="stage-controls" aria-label="回合控制">
               <button id="stepButton" type="button">擲下一顆</button>
               <button id="autoButton" type="button">自動跑完</button>
@@ -41,7 +39,7 @@
             <div id="cells" class="cells"></div>
             <div id="pieces" class="pieces"></div>
             <div id="movers" class="movers"></div>
-            <div id="dice" class="dice" aria-live="polite">?</div>
+            <div id="dice" class="dice dice-gem" aria-live="polite">?</div>
           </div>
         </div>
 

@@ -21,6 +21,15 @@ type Racer = {
 
 const trackLength = 32;
 const finish = 32;
+const dicePalette: Record<RacerId, {base: string; light: string; shadow: string}> = {
+  lu: {base: '#36b8d8', light: '#d8fbff', shadow: '#167190'},
+  west: {base: '#ee6f99', light: '#ffe0ed', shadow: '#a92c58'},
+  daphne: {base: '#e7b849', light: '#fff1b8', shadow: '#a56e13'},
+  snow: {base: '#55c99a', light: '#dcfff0', shadow: '#1d7d55'},
+  kat: {base: '#6da9f7', light: '#e4f3ff', shadow: '#2f64ad'},
+  fei: {base: '#ff875c', light: '#ffe2d3', shadow: '#b94522'},
+  boss: {base: '#8e62d9', light: '#e1d3ff', shadow: '#56309a'},
+};
 const advanceCells = new Set([3, 11, 16, 23]);
 const blockCells = new Set([10, 28]);
 const timeCells = new Set([5, 20]);
@@ -133,29 +142,44 @@ const DangoImage = ({
   );
 };
 
-const Dice = ({frame}: {frame: number}) => {
+const Dice = ({frame, activeId}: {frame: number; activeId: RacerId}) => {
   const rolling = frame >= 165 && frame <= 280;
   const value = rolling ? ((Math.floor(frame / 4) % 3) + 1) : frame > 280 ? 3 : '?';
-  const spin = rolling ? Math.sin(frame * 0.45) * 9 : 0;
+  const color = dicePalette[activeId];
+  const localFrame = Math.max(0, frame - 165);
+  const spin = rolling
+    ? interpolate(localFrame, [0, 34, 74, 115], [-38, 384, 636, 720], {extrapolateRight: 'clamp'})
+    : 0;
+  const y = rolling
+    ? interpolate(localFrame, [0, 32, 56, 82, 115], [-220, 24, -48, 10, 0], {
+        extrapolateRight: 'clamp',
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+      })
+    : 0;
+  const scale = rolling
+    ? interpolate(localFrame, [0, 36, 64, 115], [0.7, 1.12, 0.95, 1], {extrapolateRight: 'clamp'})
+    : 1;
   return (
     <div
       style={{
         position: 'absolute',
         left: 850,
-        top: 470,
+        top: 470 + y,
         width: 220,
         height: 220,
-        border: '9px solid #26384d',
-        borderRadius: 34,
-        background: '#fffdf8',
+        border: '9px solid rgba(255,255,255,0.9)',
+        borderRadius: 42,
+        background: `linear-gradient(145deg, ${color.light} 0%, ${color.base} 42%, ${color.shadow} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: 110,
         fontWeight: 950,
-        color: '#26384d',
-        transform: `rotate(${spin}deg) scale(${rolling ? 1.05 : 1})`,
-        boxShadow: '0 24px 52px rgba(33, 49, 70, 0.18)',
+        color: '#ffffff',
+        transform: `rotate(${spin}deg) scale(${scale})`,
+        clipPath: 'polygon(50% 0%, 88% 14%, 100% 50%, 82% 88%, 50% 100%, 14% 86%, 0% 50%, 15% 13%)',
+        textShadow: '0 5px 0 rgba(0,0,0,0.24), 0 -2px 0 rgba(255,255,255,0.72)',
+        boxShadow: `inset 0 11px 0 rgba(255,255,255,0.28), inset 0 -15px 0 rgba(35,34,72,0.22), 0 13px 0 ${color.shadow}, 0 34px 64px rgba(33,49,70,0.28)`,
       }}
     >
       {value}
@@ -239,7 +263,7 @@ const Track = ({frame}: {frame: number}) => {
         );
       })}
       {frame > 470 ? <DangoImage id="boss" x={trackPoint(basePositions.boss).x} y={trackPoint(basePositions.boss).y} size={210} active={frame < 570} /> : null}
-      <Dice frame={frame} />
+      <Dice frame={frame} activeId={activeId} />
     </div>
   );
 };

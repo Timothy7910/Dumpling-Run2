@@ -43,6 +43,15 @@ type MoveEvent = {
 
 const trackLength = 32;
 const finish = 32;
+const dicePalette: Record<PlayerId, {base: string; light: string; shadow: string}> = {
+  lu: {base: '#36b8d8', light: '#d8fbff', shadow: '#167190'},
+  west: {base: '#ee6f99', light: '#ffe0ed', shadow: '#a92c58'},
+  daphne: {base: '#e7b849', light: '#fff1b8', shadow: '#a56e13'},
+  snow: {base: '#55c99a', light: '#dcfff0', shadow: '#1d7d55'},
+  kat: {base: '#6da9f7', light: '#e4f3ff', shadow: '#2f64ad'},
+  fei: {base: '#ff875c', light: '#ffe2d3', shadow: '#b94522'},
+  boss: {base: '#8e62d9', light: '#e1d3ff', shadow: '#56309a'},
+};
 const advanceCells = new Set([3, 11, 16, 23]);
 const blockCells = new Set([10, 28]);
 const timeCells = new Set([5, 20]);
@@ -409,13 +418,19 @@ const positionFor = (id: PlayerId, eventIndex: number, phase: number) => {
   return {point: cellPoint(pos), stackLevel, active: false};
 };
 
-const Dice = ({roll, localFrame, fps}: {roll: number; localFrame: number; fps: number}) => {
+const Dice = ({id, roll, localFrame, fps}: {id: PlayerId; roll: number; localFrame: number; fps: number}) => {
+  const color = dicePalette[id];
   const spin = interpolate(localFrame, [0, 0.7 * fps], [0, 720], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.bezier(0.22, 1, 0.36, 1),
   });
-  const bounce = interpolate(localFrame, [0, 0.22 * fps, 0.45 * fps, 0.7 * fps], [0, -70, 18, 0], {
+  const drop = interpolate(localFrame, [0, 0.27 * fps, 0.45 * fps, 0.62 * fps, 0.78 * fps], [-220, 24, -48, 10, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+  const scale = interpolate(localFrame, [0, 0.3 * fps, 0.5 * fps, 0.78 * fps], [0.7, 1.12, 0.95, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -424,19 +439,21 @@ const Dice = ({roll, localFrame, fps}: {roll: number; localFrame: number; fps: n
       style={{
         position: 'absolute',
         left: 852,
-        top: 406 + bounce,
+        top: 406 + drop,
         width: 170,
         height: 170,
-        borderRadius: 26,
-        background: '#fffdf8',
-        border: '8px solid #2d4054',
+        borderRadius: 34,
+        background: `linear-gradient(145deg, ${color.light} 0%, ${color.base} 42%, ${color.shadow} 100%)`,
+        border: '7px solid rgba(255,255,255,0.9)',
         display: 'grid',
         placeItems: 'center',
         fontSize: 78,
         fontWeight: 900,
-        color: '#2d4054',
-        transform: `rotate(${spin}deg) scale(${interpolate(localFrame, [0, 0.25 * fps, fps], [0.72, 1.12, 1], {extrapolateRight: 'clamp'})})`,
-        boxShadow: '0 28px 50px rgba(36, 45, 66, 0.24)',
+        color: '#ffffff',
+        transform: `rotate(${spin}deg) scale(${scale})`,
+        clipPath: 'polygon(50% 0%, 88% 14%, 100% 50%, 82% 88%, 50% 100%, 14% 86%, 0% 50%, 15% 13%)',
+        textShadow: '0 4px 0 rgba(0,0,0,0.24), 0 -2px 0 rgba(255,255,255,0.72)',
+        boxShadow: `inset 0 9px 0 rgba(255,255,255,0.28), inset 0 -13px 0 rgba(35,34,72,0.22), 0 11px 0 ${color.shadow}, 0 32px 58px rgba(36,45,66,0.28)`,
       }}
     >
       {roll}
@@ -524,7 +541,7 @@ export const DangoRace = () => {
         <Dango key={id} id={id} eventIndex={activeIndex} phase={rawMove} />
       ))}
 
-      <Dice roll={ev.roll} localFrame={localFrame} fps={fps} />
+      <Dice id={ev.id} roll={ev.roll} localFrame={localFrame} fps={fps} />
 
       <div
         style={{

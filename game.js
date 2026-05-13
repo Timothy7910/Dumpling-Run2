@@ -33,6 +33,16 @@ const COLORS = {
   boss: "#7e4aac",
 };
 
+const DICE_PALETTE = [
+  { id: "aqua", base: "#36b8d8", light: "#d8fbff", shadow: "#167190", ink: "#ffffff" },
+  { id: "rose", base: "#ee6f99", light: "#ffe0ed", shadow: "#a92c58", ink: "#ffffff" },
+  { id: "gold", base: "#e7b849", light: "#fff1b8", shadow: "#a56e13", ink: "#ffffff" },
+  { id: "mint", base: "#55c99a", light: "#dcfff0", shadow: "#1d7d55", ink: "#ffffff" },
+  { id: "sky", base: "#6da9f7", light: "#e4f3ff", shadow: "#2f64ad", ink: "#ffffff" },
+  { id: "coral", base: "#ff875c", light: "#ffe2d3", shadow: "#b94522", ink: "#ffffff" },
+  { id: "boss", base: "#8e62d9", light: "#e1d3ff", shadow: "#56309a", ink: "#ffffff" },
+];
+
 const GROUPS = {
   a: {
     label: "A組",
@@ -190,8 +200,8 @@ const moversEl = document.querySelector("#movers");
 const diceEl = document.querySelector("#dice");
 const playersEl = document.querySelector("#players");
 const logEl = document.querySelector("#log");
-const turnInfoEl = document.querySelector("#turnInfo");
-const roundInfoEl = document.querySelector("#roundInfo");
+const stageRankingEl = document.querySelector("#stageRanking");
+const turnOrderEl = document.querySelector("#turnOrder");
 const simResultsEl = document.querySelector("#simResults");
 const endModalEl = document.querySelector("#endModal");
 const endRankingsEl = document.querySelector("#endRankings");
@@ -211,12 +221,13 @@ applyTrackBackground();
 setupGroupSelect();
 setupCustomPicker();
 setupStageResizeHandler();
+resetDice();
 
 document.querySelector("#newGameButton").addEventListener("click", () => {
   stopAuto();
   closeEndModal();
   game = createGame();
-  diceEl.textContent = "?";
+  resetDice();
   render();
 });
 
@@ -257,7 +268,7 @@ function setupGroupSelect() {
     stopAuto();
     closeEndModal();
     game = createGame();
-    diceEl.textContent = "?";
+    resetDice();
     simResultsEl.innerHTML = "";
     updateGroupControls();
     render();
@@ -487,6 +498,31 @@ function colorFor(id) {
   return COLORS[racerSlot(id)] || COLORS.boss;
 }
 
+function diceColorFor(id) {
+  return game.players[id]?.diceColor || DICE_PALETTE[0];
+}
+
+function applyDiceColor(id) {
+  const color = diceColorFor(id);
+  diceEl.style.setProperty("--dice-base", color.base);
+  diceEl.style.setProperty("--dice-light", color.light);
+  diceEl.style.setProperty("--dice-shadow", color.shadow);
+  diceEl.style.setProperty("--dice-ink", color.ink);
+  diceEl.dataset.owner = id;
+}
+
+function resetDice() {
+  applyDiceColor("boss");
+  diceEl.textContent = "?";
+  diceEl.dataset.value = "?";
+  diceEl.classList.remove("roll");
+}
+
+function diceStyleFor(id) {
+  const color = diceColorFor(id);
+  return `--dice-base:${color.base};--dice-light:${color.light};--dice-shadow:${color.shadow};--dice-ink:${color.ink}`;
+}
+
 function setupCustomPicker() {
   if (!customModalEl || !customGridEl) return;
   customGridEl.innerHTML = "";
@@ -619,7 +655,7 @@ function saveCustomSelection() {
   stopAuto();
   closeEndModal();
   game = createGame();
-  diceEl.textContent = "?";
+  resetDice();
   simResultsEl.innerHTML = "";
   closeCustomPicker();
   updateGroupControls();
@@ -628,6 +664,7 @@ function saveCustomSelection() {
 
 function createGame() {
   const playerIds = activePlayerIds();
+  const diceColors = assignDiceColors(playerIds);
   const customStartPositions = activeGroupId === CUSTOM_GROUP_ID ? loadCustomStartPositions() : {};
   const customStackOrder = activeGroupId === CUSTOM_GROUP_ID ? loadCustomStackOrder() : {};
   const customFirstQueueOrder = activeGroupId === CUSTOM_GROUP_ID ? loadCustomFirstQueueOrder() : {};
@@ -639,6 +676,7 @@ function createGame() {
     players[id] = {
       id,
       position: startPosition,
+      diceColor: diceColors[id],
       finished: false,
       needsFullLap,
       finishArmed: !needsFullLap,
@@ -674,6 +712,7 @@ function createGame() {
     active: false,
     lastRoll: null,
   };
+  players.boss.diceColor = DICE_PALETTE.find((color) => color.id === "boss");
 
   const state = {
     players,
@@ -681,6 +720,7 @@ function createGame() {
     stacks,
     round: 1,
     queue: firstQueue,
+    roundOrder: [...firstQueue],
     current: null,
     log: [`比賽開始，第一回合順序：${firstQueue.map((id) => NAMES[id]).join("、")}。起點由上到下依此順序堆疊。`],
     finished: false,
@@ -690,8 +730,14 @@ function createGame() {
     plannedRolls: {},
   };
   applyGroupCRoundStartRules(state, false);
+  state.roundOrder = [...state.queue];
   prepareRoundRolls(state);
   return state;
+}
+
+function assignDiceColors(playerIds) {
+  const available = shuffle(DICE_PALETTE.filter((color) => color.id !== "boss"));
+  return Object.fromEntries(playerIds.map((id, index) => [id, available[index % available.length]]));
 }
 
 async function playStep() {
@@ -740,6 +786,7 @@ function finishRound(state, withLog) {
   applyBossRoundEndRule(state, withLog);
   applyGroupCRoundEndRules(state, withLog);
   state.round += 1;
+  beginRound(state, withLog);
 }
 
 function beginRound(state, withLog) {
@@ -758,6 +805,7 @@ function beginRound(state, withLog) {
   state.queue = shuffle(active);
   const lastIds = state.playerIds.filter((id) => state.players[id].actLastThisRound);
   moveQueueIdsToEnd(state.queue, lastIds);
+  state.roundOrder = [...state.queue];
   prepareRoundRolls(state);
   addLog(state, `第 ${state.round} 回合順序：${state.queue.map((id) => NAMES[id]).join("、")}。`, withLog);
 }
@@ -800,13 +848,17 @@ function raceOrderIndex(state, id) {
 function prepareRoundRolls(state) {
   state.plannedRolls = {};
   for (const id of state.queue) {
-    if (id !== "boss" && !state.players[id]?.skipThisRound) state.plannedRolls[id] = rollDirectForPlayer(state, id);
+    if (id === "boss") {
+      state.plannedRolls[id] = rollBossDie();
+    } else if (!state.players[id]?.skipThisRound) {
+      state.plannedRolls[id] = rollDirectForPlayer(state, id);
+    }
   }
 }
 
 function rollForPlayer(state, id) {
-  if (id === "boss") return rollBossDie();
   if (Object.hasOwn(state.plannedRolls || {}, id)) return state.plannedRolls[id];
+  if (id === "boss") return rollBossDie();
   return rollDirectForPlayer(state, id);
 }
 
@@ -1397,12 +1449,13 @@ function getLastNonBoss(state) {
 }
 
 async function animateTurn(event) {
+  applyDiceColor(event.id);
   diceEl.textContent = event.roll;
+  diceEl.dataset.value = String(event.roll);
   diceEl.classList.remove("roll");
   void diceEl.offsetWidth;
   diceEl.classList.add("roll");
-  turnInfoEl.textContent = `${NAMES[event.id]}：${event.reasons.join("，")}`;
-  await wait(420);
+  await wait(760);
   await showSkillCallouts(getSkillCallouts(event));
 
   const fromPoint = cellPoint(event.from);
@@ -1484,16 +1537,10 @@ function buildPath(from, to, wrapped = false) {
 function render() {
   renderCells();
   renderPieces();
+  renderStageRanking();
+  renderTurnOrder();
   renderPlayers();
   renderLog();
-  roundInfoEl.textContent = `第 ${game.round} 回合`;
-  if (game.finished) {
-    turnInfoEl.textContent = `比賽結束：第 1 名 ${NAMES[game.rankings[0]]}`;
-  } else if (game.current) {
-    turnInfoEl.textContent = `剛行動：${NAMES[game.current]}`;
-  } else {
-    turnInfoEl.textContent = "準備開始";
-  }
 }
 
 function renderCells() {
@@ -1525,6 +1572,84 @@ function renderPieces() {
   }
 }
 
+function renderStageRanking() {
+  if (!stageRankingEl) return;
+  const previousRects = new Map(
+    [...stageRankingEl.querySelectorAll(".stage-ranking-item")].map((item) => [
+      item.dataset.id,
+      item.getBoundingClientRect(),
+    ])
+  );
+  const finishedRanks = game.rankings || [];
+  const unfinished = getRaceRanking(game).filter((id) => !finishedRanks.includes(id));
+  const rankedIds = [...finishedRanks, ...unfinished].slice(0, game.playerIds.length);
+
+  stageRankingEl.innerHTML = "";
+  rankedIds.forEach((id, index) => {
+    const row = document.createElement("div");
+    row.className = "stage-ranking-item";
+    row.dataset.id = id;
+    row.style.setProperty("--rank-color", colorFor(id));
+    row.innerHTML = `
+      <span class="stage-rank-number">${index + 1}</span>
+      <img src="${assetFor(id)}" alt="${NAMES[id]}">
+      <span class="stage-rank-name">${NAMES[id]}</span>
+    `;
+    stageRankingEl.appendChild(row);
+  });
+  animateStageRanking(previousRects);
+}
+
+function animateStageRanking(previousRects) {
+  if (!stageRankingEl || previousRects.size === 0) return;
+  for (const item of stageRankingEl.querySelectorAll(".stage-ranking-item")) {
+    const previous = previousRects.get(item.dataset.id);
+    if (!previous) continue;
+    const current = item.getBoundingClientRect();
+    const deltaY = previous.top - current.top;
+    if (Math.abs(deltaY) < 1) continue;
+    item.style.transform = `translateY(${deltaY}px)`;
+    item.style.transition = "transform 0s";
+    requestAnimationFrame(() => {
+      item.style.transform = "";
+      item.style.transition = "";
+      item.classList.add("rank-shift");
+      window.setTimeout(() => item.classList.remove("rank-shift"), 520);
+    });
+  }
+}
+
+function renderTurnOrder() {
+  if (!turnOrderEl) return;
+  const order = game.roundOrder?.length ? game.roundOrder : game.queue;
+  turnOrderEl.innerHTML = `
+    <div class="turn-order-title">本輪行動順序</div>
+    <div class="turn-order-track"></div>
+  `;
+  const track = turnOrderEl.querySelector(".turn-order-track");
+  for (const id of order) {
+    const completed = !game.queue.includes(id);
+    const card = document.createElement("div");
+    card.className = "turn-order-card";
+    card.classList.toggle("is-complete", completed);
+    card.dataset.id = id;
+    card.style.cssText = diceStyleFor(id);
+    card.innerHTML = `
+      <div class="turn-order-die" aria-label="${NAMES[id]} 的骰子">
+        <span>${plannedRollLabel(id)}</span>
+      </div>
+      <img class="turn-order-avatar" src="${assetFor(id)}" alt="${NAMES[id]}">
+    `;
+    track.appendChild(card);
+  }
+}
+
+function plannedRollLabel(id) {
+  const roll = game.plannedRolls?.[id];
+  if (roll) return roll;
+  return id === "boss" ? "?" : "?";
+}
+
 function renderPlayers() {
   const finishedRanks = game.rankings || [];
   const unfinished = getRaceRanking(game).filter((id) => !finishedRanks.includes(id));
@@ -1540,6 +1665,7 @@ function renderPlayers() {
     row.innerHTML = `
       <span class="rank">${rank}</span>
       <img class="avatar" src="${assetFor(id)}" alt="${NAMES[id]}">
+      <span class="player-die" style="${diceStyleFor(id)}" aria-label="${NAMES[id]} 的骰子"></span>
       <div class="player-main">
         <div class="player-name" style="color:${colorFor(id)}">${NAMES[id]}</div>
         <div class="player-note">${note}</div>

@@ -173,17 +173,47 @@ test("stage overlay controls scale with the map on narrow screens", () => {
   assert.match(styles, /\.cell[\s\S]*--stage-scale/);
 });
 
-test("stage header removes track title and round badge overlays the map", () => {
+test("stage header removes track title and ranking board overlays the map", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
   assert.doesNotMatch(html, /<h2>32 格圓形賽道<\/h2>/);
   assert.doesNotMatch(html, /<div class="stage-head">/);
-  assert.match(html, /<div id="stage" class="stage"[\s\S]*<div class="stage-status"[\s\S]*<span id="roundInfo" class="pill stage-round-pill">/);
-  assert.match(styles, /\.stage-status\s*\{/);
-  assert.match(styles, /\.stage-status[\s\S]*position: absolute/);
-  assert.match(styles, /\.stage-status[\s\S]*left:/);
-  assert.match(styles, /\.stage-status[\s\S]*top:/);
+  assert.doesNotMatch(html, /id="roundInfo"/);
+  assert.doesNotMatch(html, /id="turnInfo"/);
+  assert.match(html, /<div id="stageRanking" class="stage-ranking" aria-live="polite"><\/div>/);
+  assert.match(styles, /\.stage-ranking\s*\{/);
+  assert.match(styles, /\.stage-ranking[\s\S]*position: absolute/);
+  assert.match(styles, /\.stage-ranking-item/);
+  assert.match(styles, /height: 38px/);
+  assert.match(styles, /border-radius: 12px/);
+  assert.match(styles, /--stage-control-inset/);
+  assert.match(styles, /right: var\(--stage-control-inset\)/);
+  assert.match(styles, /top: var\(--stage-control-inset\)/);
+  assert.match(script, /const stageRankingEl = document\.querySelector\("#stageRanking"\)/);
+  assert.match(script, /function renderStageRanking\(\)/);
+  assert.match(script, /animateStageRanking\(previousRects\)/);
+  assert.match(script, /rankedIds = \[\.\.\.finishedRanks, \.\.\.unfinished\]/);
+});
+
+test("stage shows current round action order with completed racers desaturated", () => {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(html, /<div id="turnOrder" class="turn-order" aria-live="polite"><\/div>/);
+  assert.match(script, /const turnOrderEl = document\.querySelector\("#turnOrder"\)/);
+  assert.match(script, /roundOrder: \[\.\.\.firstQueue\]/);
+  assert.match(script, /state\.roundOrder = \[\.\.\.state\.queue\]/);
+  assert.match(script, /function renderTurnOrder\(\)/);
+  assert.match(script, /const completed = !game\.queue\.includes\(id\)/);
+  assert.match(script, /card\.classList\.toggle\("is-complete", completed\)/);
+  assert.match(script, /renderTurnOrder\(\)/);
+  assert.match(styles, /\.turn-order\s*\{/);
+  assert.match(styles, /\.turn-order-card/);
+  assert.match(styles, /\.turn-order-card\.is-complete/);
+  assert.match(styles, /filter: grayscale\(1\)/);
 });
 
 test("custom map keeps coordinate overlays aligned on mobile", () => {
@@ -309,4 +339,19 @@ test("skill callouts appear beside racers and pause before movement", () => {
   assert.match(script, /className = "skill-callout"/);
   assert.match(styles, /\.skill-callout/);
   assert.match(styles, /skill-callout-pop/);
+});
+
+test("gem dice use seven colors and assign boss purple with random racer colors", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(script, /const DICE_PALETTE = \[/);
+  assert.match(script, /id: "boss"[\s\S]*base: "#8e62d9"/);
+  assert.match(script, /function assignDiceColors\(playerIds\)/);
+  assert.match(script, /const available = shuffle\(DICE_PALETTE\.filter\(\(color\) => color\.id !== "boss"\)\)/);
+  assert.match(script, /players\.boss\.diceColor = DICE_PALETTE\.find\(\(color\) => color\.id === "boss"\)/);
+  assert.match(script, /applyDiceColor\(event\.id\)/);
+  assert.match(script, /diceEl\.dataset\.value = String\(event\.roll\)/);
+  assert.match(styles, /\.dice-gem/);
+  assert.match(styles, /clip-path: polygon/);
 });
