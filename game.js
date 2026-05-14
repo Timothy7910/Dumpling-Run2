@@ -142,7 +142,7 @@ const GROUPS = {
       lu: {
         name: "奧古斯塔團子",
         skillName: "總督權柄",
-        note: "回合開始時若在堆疊最頂端，本回合不行動，且下回合最後行動",
+        note: "行動時若在堆疊最頂端，本次不行動，且下回合最後行動",
         asset: "public/dangos/augusta-raw.png",
       },
       west: {
@@ -154,7 +154,7 @@ const GROUPS = {
       daphne: {
         name: "弗洛洛團子",
         skillName: "優雅陰謀",
-        note: "回合開始時若在堆疊最底層，本回合移動額外 +3",
+        note: "行動時若在堆疊最底層，本次移動額外 +3",
         asset: "public/dangos/fuluoluo-raw.png",
       },
       snow: {
@@ -764,6 +764,7 @@ function stepGame(state, withLog = false) {
   const actor = state.players[id];
   if (!actor || actor.finished) return stepGame(state, withLog);
   state.current = id;
+  applyGroupCActionStartRules(state, id, withLog);
   if (actor.skipThisRound) {
     const event = skipTurn(state, id, withLog);
     event.newRanks = recordFinishers(state, withLog);
@@ -1022,7 +1023,6 @@ function applyGroupCRoundStartRules(state, withLog) {
   for (const id of state.playerIds) {
     const player = state.players[id];
     player.skipThisRound = false;
-    player.bottomBonusThisRound = false;
     player.actLastThisRound = false;
     player.augustaCooldownThisRound = player.augustaCooldownNextRound;
     player.augustaCooldownNextRound = false;
@@ -1040,22 +1040,18 @@ function applyGroupCRoundStartRules(state, withLog) {
     }
   }
 
-  for (const id of state.playerIds) {
-    if (!isGroupC(id) || state.players[id].finished) continue;
-    const slot = racerSlot(id);
-    if (slot === "lu" && !state.players[id].augustaCooldownThisRound && isStackTop(state, id) && hasNonBossStackBelow(state, id)) {
-      state.players[id].skipThisRound = true;
-      state.players[id].actLastNextRound = true;
-      state.players[id].augustaCooldownNextRound = true;
-      addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本回合不行動，下回合最後行動。`, withLog);
-    }
-    if (slot === "daphne" && isStackBottom(state, id) && hasStackAbove(state, id)) {
-      state.players[id].bottomBonusThisRound = true;
-      addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本回合移動 +3。`, withLog);
-    }
-  }
-
   if (state.queue.length) moveQueueIdsToEnd(state.queue, lastIds);
+}
+
+function applyGroupCActionStartRules(state, id, withLog) {
+  if (!isGroupC(id) || state.players[id].finished) return;
+  const slot = racerSlot(id);
+  if (slot === "lu" && !state.players[id].augustaCooldownThisRound && isStackTop(state, id) && hasNonBossStackBelow(state, id)) {
+    state.players[id].skipThisRound = true;
+    state.players[id].actLastNextRound = true;
+    state.players[id].augustaCooldownNextRound = true;
+    addLog(state, `${NAMES[id]} 觸發 ${SKILL_NAMES[id]}，本次不行動，下回合最後行動。`, withLog);
+  }
 }
 
 function applyGroupCRoundEndRules(state, withLog) {
@@ -1071,8 +1067,7 @@ function applyGroupCRoundEndRules(state, withLog) {
 
 function applyGroupCTurnRules(state, id, roll, delta, reasons) {
   const slot = racerSlot(id);
-  const hasBottomBonus = state.players[id].bottomBonusThisRound || (isStackBottom(state, id) && hasStackAbove(state, id));
-  if (slot === "daphne" && hasBottomBonus) {
+  if (slot === "daphne" && isStackBottom(state, id) && hasStackAbove(state, id)) {
     reasons.push(`${SKILL_NAMES[id]}：額外前進 3 格`);
     return delta + 3;
   }

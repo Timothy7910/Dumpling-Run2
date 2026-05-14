@@ -93,17 +93,35 @@ test("C daphne bottom bonus requires another racer stacked above", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
   assert.match(script, /slot === "daphne" && isStackBottom\(state, id\) && hasStackAbove\(state, id\)/);
-  assert.match(script, /const hasBottomBonus = state\.players\[id\]\.bottomBonusThisRound \|\| \(isStackBottom\(state, id\) && hasStackAbove\(state, id\)\)/);
   assert.match(script, /function isStackBottom\(state, id\)[\s\S]*return stack\[0\] === id/);
 });
 
-test("C lu top skip requires another racer stacked below", () => {
+test("C lu top skip is checked at action time instead of round start", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const startRulesStart = script.indexOf("function applyGroupCRoundStartRules(state, withLog)");
+  const actionRulesStart = script.indexOf("function applyGroupCActionStartRules(state, id, withLog)");
+  const startRules = script.slice(startRulesStart, actionRulesStart);
+  const actionRulesEnd = script.indexOf("function applyGroupCRoundEndRules(state, withLog)");
+  const actionRules = script.slice(actionRulesStart, actionRulesEnd);
 
-  assert.match(script, /slot === "lu" && !state\.players\[id\]\.augustaCooldownThisRound && isStackTop\(state, id\) && hasNonBossStackBelow\(state, id\)/);
+  assert.match(script, /applyGroupCActionStartRules\(state, id, withLog\)/);
+  assert.match(actionRules, /slot === "lu" && !state\.players\[id\]\.augustaCooldownThisRound && isStackTop\(state, id\) && hasNonBossStackBelow\(state, id\)/);
+  assert.doesNotMatch(startRules, /slot === "lu" && !state\.players\[id\]\.augustaCooldownThisRound && isStackTop\(state, id\) && hasNonBossStackBelow\(state, id\)/);
   assert.match(script, /augustaCooldownNextRound/);
   assert.match(script, /augustaCooldownThisRound/);
-  assert.match(script, /slot === "lu" && !state\.players\[id\]\.augustaCooldownThisRound && isStackTop\(state, id\) && hasNonBossStackBelow\(state, id\)/);
+});
+
+test("C daphne bottom bonus is checked at action time instead of round start", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const startRulesStart = script.indexOf("function applyGroupCRoundStartRules(state, withLog)");
+  const endRulesStart = script.indexOf("function applyGroupCRoundEndRules(state, withLog)");
+  const startRules = script.slice(startRulesStart, endRulesStart);
+  const turnRulesStart = script.indexOf("function applyGroupCTurnRules(state, id, roll, delta, reasons)");
+  const turnRulesEnd = script.indexOf("function applyGroupCAfterMoveRules(state, movedIds, from, reasons)");
+  const turnRules = script.slice(turnRulesStart, turnRulesEnd);
+
+  assert.match(turnRules, /slot === "daphne" && isStackBottom\(state, id\) && hasStackAbove\(state, id\)/);
+  assert.doesNotMatch(startRules, /slot === "daphne" && isStackBottom\(state, id\) && hasStackAbove\(state, id\)/);
 });
 
 test("C lu zero-step skip can trigger C kat landing skill when stopped above kat", () => {
