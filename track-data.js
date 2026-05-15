@@ -11,7 +11,7 @@
   const DEFAULT_ADVANCE_CELLS = [3, 11, 16, 23];
   const DEFAULT_BLOCK_CELLS = [10, 28];
   const DEFAULT_TIME_CELLS = [6, 20];
-  const KNOCKOUT_ADVANCE_CELLS = [4, 20];
+  const KNOCKOUT_ADVANCE_CELLS = [1, 4, 10, 20];
   const KNOCKOUT_BLOCK_CELLS = [16, 26, 30];
   const KNOCKOUT_TIME_CELLS = [6, 14, 23];
   const TRACKS = Object.freeze({
@@ -72,29 +72,29 @@
     { index: 7, x: 66.105, y: 67.026 },
     { index: 8, x: 57.586, y: 67.355 },
     { index: 9, x: 48.798, y: 71.959 },
-    { index: 10, x: 37.859, y: 81.496 },
-    { index: 11, x: 27.278, y: 87.087 },
-    { index: 12, x: 15.172, y: 83.634 },
-    { index: 13, x: 10.689, y: 71.794 },
-    { index: 14, x: 10.24, y: 59.79 },
-    { index: 15, x: 21.449, y: 45.813 },
-    { index: 16, x: 29.071, y: 38.742 },
-    { index: 17, x: 35.258, y: 33.809 },
-    { index: 18, x: 41.714, y: 29.862 },
-    { index: 19, x: 44.315, y: 25.916 },
-    { index: 20, x: 41.356, y: 19.831 },
-    { index: 21, x: 39.293, y: 15.063 },
-    { index: 22, x: 39.562, y: 11.116 },
-    { index: 23, x: 41.983, y: 8.156 },
-    { index: 24, x: 47.184, y: 9.801 },
+    { index: 10, x: 37.679, y: 81.168 },
+    { index: 11, x: 27.726, y: 87.416 },
+    { index: 12, x: 15.262, y: 83.963 },
+    { index: 13, x: 10.509, y: 71.959 },
+    { index: 14, x: 10.061, y: 59.626 },
+    { index: 15, x: 21.27, y: 45.813 },
+    { index: 16, x: 28.802, y: 38.742 },
+    { index: 17, x: 35.348, y: 33.644 },
+    { index: 18, x: 41.714, y: 30.191 },
+    { index: 19, x: 44.136, y: 25.916 },
+    { index: 20, x: 41.445, y: 19.503 },
+    { index: 21, x: 39.204, y: 14.898 },
+    { index: 22, x: 39.652, y: 10.787 },
+    { index: 23, x: 42.073, y: 8.321 },
+    { index: 24, x: 46.826, y: 9.143 },
     { index: 25, x: 52.475, y: 8.814 },
-    { index: 26, x: 58.214, y: 8.156 },
-    { index: 27, x: 62.518, y: 8.156 },
+    { index: 26, x: 58.303, y: 8.156 },
+    { index: 27, x: 62.518, y: 7.992 },
     { index: 28, x: 65.477, y: 14.569 },
-    { index: 29, x: 67.539, y: 19.174 },
-    { index: 30, x: 69.602, y: 25.094 },
-    { index: 31, x: 74.085, y: 36.275 },
-    { index: 32, x: 79.735, y: 40.551 },
+    { index: 29, x: 67.629, y: 19.338 },
+    { index: 30, x: 69.692, y: 25.258 },
+    { index: 31, x: 74.175, y: 36.44 },
+    { index: 32, x: 79.645, y: 40.715 },
   ];
 
   const DEFAULT_TRACK_CONFIG = Object.freeze({
