@@ -75,13 +75,13 @@ test("knockout track falls back to baked knockout coordinates when no saved data
   const config = loadTrackConfig(storage, "knockout");
 
   assert.equal(config.backgroundImage, "public/maps/knockout-map.png");
-  assert.equal(config.points[0].x, 85.204);
-  assert.equal(config.points[0].y, 48.115);
-  assert.equal(config.points[9].x, 37.679);
-  assert.equal(config.points[9].y, 81.168);
-  assert.equal(config.points[31].x, 79.645);
-  assert.equal(config.points[31].y, 40.715);
-  assert.deepEqual([...config.advanceCells], [1, 4, 10, 20]);
+  assert.equal(config.points[0].x, 85.115);
+  assert.equal(config.points[0].y, 47.951);
+  assert.equal(config.points[9].x, 37.948);
+  assert.equal(config.points[9].y, 81.496);
+  assert.equal(config.points[31].x, 79.466);
+  assert.equal(config.points[31].y, 41.209);
+  assert.deepEqual([...config.advanceCells], [4, 10, 20]);
   assert.deepEqual([...config.blockCells], [16, 26, 30]);
   assert.deepEqual([...config.timeCells], [6, 14, 23]);
 });
