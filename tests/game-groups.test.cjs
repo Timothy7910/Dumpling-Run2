@@ -17,6 +17,33 @@ test("game page exposes an A/B/C group selector beside the title", () => {
   assert.match(html, />C組</);
 });
 
+test("game loads the active map selected by the map editor", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(script, /loadActiveTrackId\(\)/);
+  assert.match(script, /loadTrackConfig\(undefined, ACTIVE_TRACK_ID\)/);
+});
+
+test("game page exposes map selectors beside group and inside custom setup", () => {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+
+  assert.match(html, /id="trackSelect"/);
+  assert.match(html, /id="customTrackSelect"/);
+  assert.match(script, /setupTrackSelects\(\)/);
+  assert.match(script, /ACTIVE_TRACK_STORAGE_KEY/);
+  assert.match(script, /window\.location\.reload\(\)/);
+});
+
+test("map editor can select and save the knockout map independently", () => {
+  const html = fs.readFileSync(path.join(root, "map-editor.html"), "utf8");
+
+  assert.match(html, /id="trackSelect"/);
+  assert.match(html, /window\.DangoTrack\.TRACKS/);
+  assert.match(html, /ACTIVE_TRACK_STORAGE_KEY/);
+  assert.match(html, /getTrackStorageKey\(activeTrackId\)/);
+});
+
 test("C group is the default group for new page visits", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 

@@ -3,8 +3,11 @@ const assert = require("node:assert/strict");
 
 const {
   DEFAULT_TRACK_CONFIG,
+  DEFAULT_TRACK_ID,
+  TRACKS,
   STORAGE_KEY,
   createTrackConfig,
+  getTrackStorageKey,
   loadTrackConfig,
   serializeTrackConfig,
   validateTrackConfig,
@@ -23,6 +26,42 @@ test("default track has 32 numbered points and expected special cells", () => {
   assert.equal(config.points[0].x, 79.909);
   assert.equal(config.points[0].y, 52.329);
   assert.equal(config.points[31].index, 32);
+});
+
+test("track definitions include separate group and knockout maps", () => {
+  assert.equal(DEFAULT_TRACK_ID, "group");
+  assert.equal(TRACKS.group.backgroundImage, "public/maps/reference-map.png");
+  assert.equal(TRACKS.knockout.backgroundImage, "public/maps/knockout-map.png");
+  assert.equal(getTrackStorageKey("group"), STORAGE_KEY);
+  assert.equal(getTrackStorageKey("knockout"), `${STORAGE_KEY}:knockout`);
+});
+
+test("loadTrackConfig reads the requested track storage key", () => {
+  const points = Array.from({ length: 32 }, (_, index) => ({
+    index: index + 1,
+    x: index + 1,
+    y: index + 2,
+  }));
+  const storage = {
+    getItem(key) {
+      assert.equal(key, `${STORAGE_KEY}:knockout`);
+      return JSON.stringify({
+        version: 2,
+        backgroundImage: "public/maps/knockout-map.png",
+        points,
+        advanceCells: [2],
+        blockCells: [3],
+        timeCells: [4],
+        finish: 32,
+      });
+    },
+  };
+
+  const config = loadTrackConfig(storage, "knockout");
+
+  assert.equal(config.backgroundImage, "public/maps/knockout-map.png");
+  assert.equal(config.points[0].x, 1);
+  assert.deepEqual([...config.timeCells], [4]);
 });
 
 test("createTrackConfig accepts annotated points and custom cell types", () => {

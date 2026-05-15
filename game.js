@@ -1,4 +1,5 @@
-const TRACK_CONFIG = window.DangoTrack.loadTrackConfig();
+const ACTIVE_TRACK_ID = window.DangoTrack.loadActiveTrackId();
+const TRACK_CONFIG = window.DangoTrack.loadTrackConfig(undefined, ACTIVE_TRACK_ID);
 const TRACK_LENGTH = TRACK_CONFIG.length;
 const FINISH = TRACK_CONFIG.finish;
 const ADVANCE_CELLS = TRACK_CONFIG.advanceCells;
@@ -209,6 +210,7 @@ const stepButton = document.querySelector("#stepButton");
 const autoButton = document.querySelector("#autoButton");
 const endOkButton = document.querySelector("#endOkButton");
 const groupSelectEl = document.querySelector("#groupSelect");
+const trackSelectEls = [document.querySelector("#trackSelect"), document.querySelector("#customTrackSelect")].filter(Boolean);
 const customGroupButton = document.querySelector("#customGroupButton");
 const customModalEl = document.querySelector("#customModal");
 const customGridEl = document.querySelector("#customGrid");
@@ -218,6 +220,7 @@ const customCancelButton = document.querySelector("#customCancelButton");
 const customResetOrderButton = document.querySelector("#customResetOrderButton");
 
 applyTrackBackground();
+setupTrackSelects();
 setupGroupSelect();
 setupCustomPicker();
 setupStageResizeHandler();
@@ -274,6 +277,29 @@ function setupGroupSelect() {
     render();
   });
   customGroupButton?.addEventListener("click", openCustomPicker);
+}
+
+function setupTrackSelects() {
+  if (!trackSelectEls.length) return;
+  const options = Object.values(window.DangoTrack.TRACKS)
+    .map((track) => `<option value="${track.id}">${track.label}</option>`)
+    .join("");
+
+  trackSelectEls.forEach((select) => {
+    select.innerHTML = options;
+    select.value = ACTIVE_TRACK_ID;
+    select.addEventListener("change", () => {
+      window.localStorage?.setItem(window.DangoTrack.ACTIVE_TRACK_STORAGE_KEY, select.value);
+      syncTrackSelects(select.value);
+      window.location.reload();
+    });
+  });
+}
+
+function syncTrackSelects(trackId) {
+  trackSelectEls.forEach((select) => {
+    select.value = trackId;
+  });
 }
 
 function loadActiveGroupId() {

@@ -194,6 +194,10 @@ h2 {
   cursor: pointer;
 }
 
+.track-select {
+  min-width: 132px;
+}
+
 .controls,
 .sim-controls {
   display: flex;
@@ -857,6 +861,23 @@ h2 {
   font-weight: 800;
 }
 
+.custom-head-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.custom-track-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
 .custom-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1451,6 +1472,15 @@ button.ghost {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.track-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
 }
 
 .editor-layout {

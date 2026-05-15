@@ -18,6 +18,7 @@
               <option value="b">B組</option>
               <option value="c">C組</option>
             </select>
+            <select id="trackSelect" class="group-select track-select" aria-label="地圖切換"></select>
           </div>
         </div>
         <div class="controls" aria-label="遊戲控制">
@@ -93,7 +94,13 @@
             <h2 id="customTitle">自訂參賽團子</h2>
             <p>從 A、B、C 組共 18 顆中選 6 顆</p>
           </div>
-          <span id="customCount" class="pill">0/6</span>
+          <div class="custom-head-controls">
+            <label class="custom-track-control">
+              地圖
+              <select id="customTrackSelect" class="group-select track-select" aria-label="自訂比賽地圖切換"></select>
+            </label>
+            <span id="customCount" class="pill">0/6</span>
+          </div>
         </div>
         <div id="customGrid" class="custom-grid"></div>
         <div class="custom-actions">

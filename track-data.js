@@ -5,10 +5,24 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
   const TRACK_LENGTH = 32;
   const STORAGE_KEY = "dango-race-track-config";
+  const ACTIVE_TRACK_STORAGE_KEY = "dango-race-active-track";
   const TRACK_VERSION = 2;
+  const DEFAULT_TRACK_ID = "group";
   const DEFAULT_ADVANCE_CELLS = [3, 11, 16, 23];
   const DEFAULT_BLOCK_CELLS = [10, 28];
   const DEFAULT_TIME_CELLS = [6, 20];
+  const TRACKS = Object.freeze({
+    group: Object.freeze({
+      id: "group",
+      label: "小組賽",
+      backgroundImage: "public/maps/reference-map.png",
+    }),
+    knockout: Object.freeze({
+      id: "knockout",
+      label: "淘汰賽",
+      backgroundImage: "public/maps/knockout-map.png",
+    }),
+  });
 
   const defaultPoints = [
     { index: 1, x: 79.909, y: 52.329 },
@@ -49,7 +63,7 @@
     length: TRACK_LENGTH,
     version: TRACK_VERSION,
     finish: TRACK_LENGTH,
-    backgroundImage: "public/maps/reference-map.png",
+    backgroundImage: TRACKS.group.backgroundImage,
     points: defaultPoints,
     advanceCells: DEFAULT_ADVANCE_CELLS,
     blockCells: DEFAULT_BLOCK_CELLS,
@@ -108,17 +122,38 @@
     };
   }
 
-  function loadTrackConfig(storage) {
+  function loadTrackConfig(storage, trackId = DEFAULT_TRACK_ID) {
     const store = storage || (typeof window !== "undefined" ? window.localStorage : null);
-    if (!store) return createTrackConfig();
+    const track = getTrackDefinition(trackId);
+    if (!store) return createTrackConfig({ backgroundImage: track.backgroundImage });
 
     try {
-      const saved = store.getItem(STORAGE_KEY);
-      if (!saved) return createTrackConfig();
+      const saved = store.getItem(getTrackStorageKey(track.id));
+      if (!saved) return createTrackConfig({ backgroundImage: track.backgroundImage });
       const parsed = JSON.parse(saved);
-      return parsed.version === TRACK_VERSION ? createTrackConfig(parsed) : createTrackConfig();
+      return parsed.version === TRACK_VERSION ? createTrackConfig(parsed) : createTrackConfig({ backgroundImage: track.backgroundImage });
     } catch (error) {
-      return createTrackConfig();
+      return createTrackConfig({ backgroundImage: track.backgroundImage });
+    }
+  }
+
+  function getTrackDefinition(trackId) {
+    return TRACKS[trackId] || TRACKS[DEFAULT_TRACK_ID];
+  }
+
+  function getTrackStorageKey(trackId) {
+    const track = getTrackDefinition(trackId);
+    return track.id === DEFAULT_TRACK_ID ? STORAGE_KEY : `${STORAGE_KEY}:${track.id}`;
+  }
+
+  function loadActiveTrackId(storage) {
+    const store = storage || (typeof window !== "undefined" ? window.localStorage : null);
+    if (!store) return DEFAULT_TRACK_ID;
+
+    try {
+      return getTrackDefinition(store.getItem(ACTIVE_TRACK_STORAGE_KEY)).id;
+    } catch (error) {
+      return DEFAULT_TRACK_ID;
     }
   }
 
@@ -160,10 +195,16 @@
 
   return {
     STORAGE_KEY,
+    ACTIVE_TRACK_STORAGE_KEY,
     TRACK_LENGTH,
     TRACK_VERSION,
+    DEFAULT_TRACK_ID,
+    TRACKS,
     DEFAULT_TRACK_CONFIG,
     createTrackConfig,
+    getTrackDefinition,
+    getTrackStorageKey,
+    loadActiveTrackId,
     loadTrackConfig,
     serializeTrackConfig,
     validateTrackConfig,

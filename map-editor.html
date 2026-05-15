@@ -14,6 +14,10 @@
           <h1>點選每一格</h1>
         </div>
         <nav class="editor-actions" aria-label="地圖操作">
+          <label class="track-picker">
+            地圖
+            <select id="trackSelect" class="group-select" aria-label="選擇要標註的地圖"></select>
+          </label>
           <a class="text-button" href="index.html">回到遊戲</a>
           <button id="undoButton" type="button">復原</button>
           <button id="clearButton" class="ghost" type="button">清空</button>
@@ -24,7 +28,7 @@
       <section class="editor-layout">
         <div class="map-workbench">
           <div id="mapCanvas" class="map-canvas" aria-label="點選地圖上的 32 個格子">
-            <img src="public/maps/reference-map.png" alt="待標註的遊戲地圖">
+            <img id="mapImage" src="public/maps/reference-map.png" alt="待標註的遊戲地圖">
             <div id="markerLayer" class="marker-layer"></div>
           </div>
         </div>
@@ -69,15 +73,28 @@
       const pointCount = document.querySelector("#pointCount");
       const statusText = document.querySelector("#statusText");
       const exportText = document.querySelector("#exportText");
+      const trackSelect = document.querySelector("#trackSelect");
+      const mapImage = document.querySelector("#mapImage");
       const typeButtons = [...document.querySelectorAll(".type-button")];
 
-      const backgroundImage = "public/maps/reference-map.png";
       const maxPoints = window.DangoTrack.TRACK_LENGTH;
+      let activeTrackId = window.DangoTrack.loadActiveTrackId(window.localStorage);
+      let activeTrack = window.DangoTrack.getTrackDefinition(activeTrackId);
+      let backgroundImage = activeTrack.backgroundImage;
       let points = [];
       let selectedIndex = null;
 
+      setupTrackSelect();
       initFromStorage();
       render();
+
+      trackSelect.addEventListener("change", () => {
+        activeTrackId = trackSelect.value;
+        activeTrack = window.DangoTrack.getTrackDefinition(activeTrackId);
+        backgroundImage = activeTrack.backgroundImage;
+        initFromStorage();
+        render();
+      });
 
       canvas.addEventListener("click", (event) => {
         if (event.target.closest(".map-marker")) return;
@@ -112,7 +129,8 @@
           return;
         }
         const config = buildConfig();
-        window.localStorage.setItem(window.DangoTrack.STORAGE_KEY, window.DangoTrack.serializeTrackConfig(config));
+        window.localStorage.setItem(window.DangoTrack.ACTIVE_TRACK_STORAGE_KEY, activeTrackId);
+        window.localStorage.setItem(window.DangoTrack.getTrackStorageKey(activeTrackId), window.DangoTrack.serializeTrackConfig(config));
         setStatus("已套用到遊戲。回到遊戲頁重新整理即可看到新地圖。");
       });
 
@@ -137,9 +155,22 @@
         if (type) setSelectedType(type);
       });
 
+      function setupTrackSelect() {
+        trackSelect.innerHTML = Object.values(window.DangoTrack.TRACKS)
+          .map((track) => `<option value="${track.id}">${track.label}</option>`)
+          .join("");
+        trackSelect.value = activeTrack.id;
+      }
+
       function initFromStorage() {
-        const saved = window.DangoTrack.loadTrackConfig(window.localStorage);
-        if (!saved.backgroundImage) return;
+        mapImage.src = activeTrack.backgroundImage;
+        const savedRaw = window.localStorage.getItem(window.DangoTrack.getTrackStorageKey(activeTrackId));
+        const saved = window.DangoTrack.loadTrackConfig(window.localStorage, activeTrackId);
+        if (!savedRaw && activeTrackId !== window.DangoTrack.DEFAULT_TRACK_ID) {
+          points = [];
+          selectedIndex = null;
+          return;
+        }
         points = saved.points.map((point) => ({
           ...point,
           type: getPointType(point.index, saved),
