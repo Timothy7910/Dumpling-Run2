@@ -249,6 +249,9 @@ h2 {
 .stage {
   position: relative;
   --stage-scale: 1;
+  --camera-x: 50;
+  --camera-y: 50;
+  --camera-scale: 1;
   width: 100%;
   aspect-ratio: 16 / 9;
   min-height: 520px;
@@ -261,6 +264,26 @@ h2 {
 
 .stage.custom-map {
   min-height: 0;
+  background: linear-gradient(180deg, #edf8fb 0%, #fff9f0 100%);
+}
+
+.stage-camera {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  transform:
+    translate(
+      calc((50 - var(--camera-x) * var(--camera-scale)) * 1%),
+      calc((50 - var(--camera-y) * var(--camera-scale)) * 1%)
+    )
+    scale(var(--camera-scale));
+  transform-origin: 0 0;
+  transition: transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.stage.custom-map .stage-camera {
   background:
     linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
     var(--map-image) 0 0 / 100% 100% no-repeat;

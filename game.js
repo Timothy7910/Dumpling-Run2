@@ -218,6 +218,8 @@ const customCountEl = document.querySelector("#customCount");
 const customSaveButton = document.querySelector("#customSaveButton");
 const customCancelButton = document.querySelector("#customCancelButton");
 const customResetOrderButton = document.querySelector("#customResetOrderButton");
+const stageCameraEl = document.querySelector("#stageCamera");
+const CAMERA_FOCUS_SCALE = 1.55;
 
 applyTrackBackground();
 setupTrackSelects();
@@ -231,6 +233,7 @@ document.querySelector("#newGameButton").addEventListener("click", () => {
   closeEndModal();
   game = createGame();
   resetDice();
+  resetStageCamera();
   render();
 });
 
@@ -272,6 +275,7 @@ function setupGroupSelect() {
     closeEndModal();
     game = createGame();
     resetDice();
+    resetStageCamera();
     simResultsEl.innerHTML = "";
     updateGroupControls();
     render();
@@ -682,6 +686,7 @@ function saveCustomSelection() {
   closeEndModal();
   game = createGame();
   resetDice();
+  resetStageCamera();
   simResultsEl.innerHTML = "";
   closeCustomPicker();
   updateGroupControls();
@@ -1470,6 +1475,8 @@ function getLastNonBoss(state) {
 }
 
 async function animateTurn(event) {
+  setStageCameraTarget(event.id, event.from);
+  await wait(220);
   applyDiceColor(event.id);
   diceEl.textContent = event.roll;
   diceEl.dataset.value = String(event.roll);
@@ -1493,6 +1500,7 @@ async function animateTurn(event) {
 
   const path = buildPath(event.from, event.to, event.wrapped);
   for (let i = 0; i < path.length; i++) {
+    setStageCameraTarget(event.id, path[i]);
     const point = cellPoint(path[i]);
     moving.forEach((img, index) => {
       setPieceVars(img, point, index, event.carried[index], 220 + index);
@@ -1506,6 +1514,29 @@ async function animateTurn(event) {
   moving.forEach((img) => img.remove());
   hidePieces(event.carried, false);
   diceEl.classList.remove("roll");
+}
+
+function setStageCameraTarget(id, position, scale = CAMERA_FOCUS_SCALE) {
+  if (!stageEl || !stageCameraEl) return;
+  const point = cellPoint(position);
+  const isBoss = id === "boss";
+  const focusScale = isBoss ? Math.max(1.35, scale - 0.12) : scale;
+  const halfX = 50 / focusScale;
+  const halfY = 50 / focusScale;
+  const x = clamp(point.x, halfX, 100 - halfX);
+  const y = clamp(point.y, halfY, 100 - halfY);
+  stageEl.style.setProperty("--camera-x", x.toFixed(3));
+  stageEl.style.setProperty("--camera-y", y.toFixed(3));
+  stageEl.style.setProperty("--camera-scale", focusScale.toFixed(3));
+  stageEl.dataset.cameraTarget = id;
+}
+
+function resetStageCamera() {
+  if (!stageEl) return;
+  stageEl.style.setProperty("--camera-x", "50");
+  stageEl.style.setProperty("--camera-y", "50");
+  stageEl.style.setProperty("--camera-scale", "1");
+  delete stageEl.dataset.cameraTarget;
 }
 
 function getSkillCallouts(event) {
@@ -1860,6 +1891,7 @@ function applyTrackBackground() {
   if (!stageEl || !TRACK_CONFIG.backgroundImage) return;
   stageEl.classList.add("custom-map");
   stageEl.style.setProperty("--map-image", `url("${TRACK_CONFIG.backgroundImage}")`);
+  stageCameraEl?.style.setProperty("--map-image", `url("${TRACK_CONFIG.backgroundImage}")`);
 }
 
 function getCellClass(index) {

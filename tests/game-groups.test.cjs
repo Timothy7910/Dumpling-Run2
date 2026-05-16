@@ -35,6 +35,21 @@ test("game page exposes map selectors beside group and inside custom setup", () 
   assert.match(script, /window\.location\.reload\(\)/);
 });
 
+test("stage camera zooms toward the active racer during turns", () => {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+
+  assert.match(html, /id="stageCamera"/);
+  assert.match(script, /const stageCameraEl = document\.querySelector\("#stageCamera"\)/);
+  assert.match(script, /function setStageCameraTarget/);
+  assert.match(script, /setStageCameraTarget\(event\.id, event\.from\)/);
+  assert.match(script, /setStageCameraTarget\(event\.id, path\[i\]\)/);
+  assert.match(styles, /\.stage-camera/);
+  assert.match(styles, /--camera-scale/);
+  assert.match(styles, /transform:[\s\S]*translate\(/);
+});
+
 test("map editor can select and save the knockout map independently", () => {
   const html = fs.readFileSync(path.join(root, "map-editor.html"), "utf8");
 
