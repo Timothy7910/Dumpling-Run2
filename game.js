@@ -1412,6 +1412,7 @@ function applyBossRoundEndRule(state, withLog) {
   const bossIndex = stack.indexOf("boss");
   if (bossIndex < 0) return;
   if (!isBossLastPlace(state)) return;
+  if (hasStackAbove(state, "boss")) return;
 
   stack.splice(bossIndex, 1);
   state.stacks[FINISH].unshift("boss");

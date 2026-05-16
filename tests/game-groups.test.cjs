@@ -187,6 +187,17 @@ test("boss affects C fei last-place checks and returns to finish when last at ro
   assert.match(script, /我還會回來的/);
 });
 
+test("boss only returns to finish at round end when last with no riders above", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const ruleStart = script.indexOf("function applyBossRoundEndRule(state, withLog)");
+  const ruleEnd = script.indexOf("function checkBossMeeting(state, ids, position)");
+  const rule = script.slice(ruleStart, ruleEnd);
+
+  assert.match(rule, /if \(hasStackAbove\(state, "boss"\)\) return/);
+  assert.match(rule, /if \(!isBossLastPlace\(state\)\) return/);
+  assert.match(rule, /state\.stacks\[FINISH\]\.unshift\("boss"\)/);
+});
+
 test("A west marking only runs for the actual A-group west racer", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
