@@ -390,13 +390,30 @@ test("win-rate simulation reports average rank and top-four rate", () => {
   assert.match(styles, /\.sim-stats/);
 });
 
-test("B snow teleports onto the nearest racer ahead and lands on top", () => {
+test("B snow teleports itself onto the nearest racer ahead and lands on top", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
 
   assert.match(script, /position > actor\.position/);
   assert.match(script, /\.sort\(\(a, b\) => a - b\)\[0\]/);
-  assert.match(script, /teleportCarriedGroup\(state, movedIds, targetPosition, leader\)/);
-  assert.match(script, /topId \? \[\.\.\.movedIds\.filter\(\(id\) => id !== topId\), topId\] : movedIds/);
+  assert.match(script, /teleportSingleRacer\(state, leader, targetPosition, true\)/);
+  assert.match(script, /state\.stacks\[to\]\.push\(id\)/);
+});
+
+test("B snow electronic ghost teleports only itself and animates instantly", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const afterMoveStart = script.indexOf("function applyGroupBAfterMoveRules(state, movedIds, from, reasons)");
+  const afterMoveEnd = script.indexOf("function applyGroupCRoundStartRules(state, withLog)");
+  const afterMoveRules = script.slice(afterMoveStart, afterMoveEnd);
+  const animateStart = script.indexOf("async function animateTurn(event)");
+  const animateEnd = script.indexOf("function setStageCameraTarget");
+  const animateTurn = script.slice(animateStart, animateEnd);
+
+  assert.match(afterMoveRules, /teleportSingleRacer\(state, leader, targetPosition, true\)/);
+  assert.match(afterMoveRules, /movedIds\.splice\(0, movedIds\.length, leader\)/);
+  assert.match(afterMoveRules, /return true/);
+  assert.match(script, /const instant = applyGroupBAfterMoveRules\(state, moved\.carried, moved\.from, reasons\)/);
+  assert.match(script, /instant,?/);
+  assert.match(animateTurn, /event\.instant \? \[event\.to\] : buildPath/);
 });
 
 test("map removes transient text overlays and first-place spotlight", () => {

@@ -973,7 +973,7 @@ function takeTurn(state, id, withLog) {
   const moved = moveStackFrom(state, id, delta);
   const beforeLanding = moved.to;
   applyLandingRules(state, moved.carried, withLog, reasons);
-  applyGroupBAfterMoveRules(state, moved.carried, moved.from, reasons);
+  const instant = applyGroupBAfterMoveRules(state, moved.carried, moved.from, reasons);
   applyGroupCAfterMoveRules(state, moved.carried, moved.from, reasons);
   applyJinxiLandingTrigger(state, id, moved.to, withLog, reasons);
   actor.hasMoved = true;
@@ -990,6 +990,7 @@ function takeTurn(state, id, withLog) {
     to: finalTo,
     carried: moved.carried,
     wrapped: moved.wrapped,
+    instant,
     reasons: [...reasons],
   };
   addLog(
@@ -1035,18 +1036,20 @@ function applyGroupBTurnRules(state, id, roll, delta, reasons) {
 
 function applyGroupBAfterMoveRules(state, movedIds, from, reasons) {
   const leader = movedIds[0];
-  if (!isGroupB(leader) || racerSlot(leader) !== "snow") return;
+  if (!isGroupB(leader) || racerSlot(leader) !== "snow") return false;
   const actor = state.players[leader];
   const midpoint = Math.ceil(FINISH / 2);
-  if (actor.electronicGhostUsed || actor.position <= midpoint || actor.position >= FINISH) return;
+  if (actor.electronicGhostUsed || actor.position <= midpoint || actor.position >= FINISH) return false;
   const targetPosition = state.playerIds
     .filter((id) => id !== leader && !state.players[id].finished && state.players[id].position > actor.position)
     .map((id) => state.players[id].position)
     .sort((a, b) => a - b)[0];
-  if (!targetPosition) return;
+  if (!targetPosition) return false;
   actor.electronicGhostUsed = true;
-  teleportCarriedGroup(state, movedIds, targetPosition, leader);
+  teleportSingleRacer(state, leader, targetPosition, true);
+  movedIds.splice(0, movedIds.length, leader);
   reasons.push(`${SKILL_NAMES[leader]}：傳送到最近團子頂端`);
+  return true;
 }
 
 function applyGroupCRoundStartRules(state, withLog) {
@@ -1258,6 +1261,17 @@ function teleportCarriedGroup(state, movedIds, to, topId = null) {
   removeIdsFromStack(state.stacks[from], movedIds);
   state.stacks[to].push(...landingOrder);
   for (const id of movedIds) state.players[id].position = to;
+}
+
+function teleportSingleRacer(state, id, to, landOnTop = false) {
+  const from = state.players[id].position;
+  removeIdsFromStack(state.stacks[from], [id]);
+  if (landOnTop) {
+    state.stacks[to].push(id);
+  } else {
+    state.stacks[to].unshift(id);
+  }
+  state.players[id].position = to;
 }
 
 function moveStackFrom(state, id, delta) {
@@ -1499,7 +1513,7 @@ async function animateTurn(event) {
   });
   hidePieces(event.carried, true);
 
-  const path = buildPath(event.from, event.to, event.wrapped);
+  const path = event.instant ? [event.to] : buildPath(event.from, event.to, event.wrapped);
   for (let i = 0; i < path.length; i++) {
     setStageCameraTarget(event.id, path[i]);
     const point = cellPoint(path[i]);
