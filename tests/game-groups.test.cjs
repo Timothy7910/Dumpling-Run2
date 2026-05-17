@@ -416,6 +416,20 @@ test("B snow electronic ghost teleports only itself and animates instantly", () 
   assert.match(animateTurn, /event\.instant \? \[event\.to\] : buildPath/);
 });
 
+test("B snow electronic ghost leaves carried riders at the starting cell", () => {
+  const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
+  const afterMoveStart = script.indexOf("function applyGroupBAfterMoveRules(state, movedIds, from, reasons)");
+  const afterMoveEnd = script.indexOf("function applyGroupCRoundStartRules(state, withLog)");
+  const afterMoveRules = script.slice(afterMoveStart, afterMoveEnd);
+
+  assert.match(afterMoveRules, /const riders = movedIds\.slice\(1\)/);
+  assert.match(afterMoveRules, /restoreRidersToStart\(state, riders, actor\.position, from\)/);
+  assert.match(script, /function restoreRidersToStart\(state, riders, currentPosition, from\)/);
+  assert.match(script, /removeIdsFromStack\(state\.stacks\[currentPosition\], riders\)/);
+  assert.match(script, /state\.stacks\[from\]\.push\(\.\.\.riders\)/);
+  assert.match(script, /state\.players\[id\]\.position = from/);
+});
+
 test("map removes transient text overlays and first-place spotlight", () => {
   const script = fs.readFileSync(path.join(root, "game.js"), "utf8");
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");

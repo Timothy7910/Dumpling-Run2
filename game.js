@@ -1046,6 +1046,8 @@ function applyGroupBAfterMoveRules(state, movedIds, from, reasons) {
     .sort((a, b) => a - b)[0];
   if (!targetPosition) return false;
   actor.electronicGhostUsed = true;
+  const riders = movedIds.slice(1);
+  restoreRidersToStart(state, riders, actor.position, from);
   teleportSingleRacer(state, leader, targetPosition, true);
   movedIds.splice(0, movedIds.length, leader);
   reasons.push(`${SKILL_NAMES[leader]}：傳送到最近團子頂端`);
@@ -1272,6 +1274,13 @@ function teleportSingleRacer(state, id, to, landOnTop = false) {
     state.stacks[to].unshift(id);
   }
   state.players[id].position = to;
+}
+
+function restoreRidersToStart(state, riders, currentPosition, from) {
+  if (!riders.length || currentPosition === from) return;
+  removeIdsFromStack(state.stacks[currentPosition], riders);
+  state.stacks[from].push(...riders);
+  for (const id of riders) state.players[id].position = from;
 }
 
 function moveStackFrom(state, id, delta) {
